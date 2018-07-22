@@ -31,8 +31,9 @@ timer        .equ pixelShadow + 15
 
 score        .equ pixelShadow + 18
 multiplier   .equ pixelShadow + 21
+round        .equ pixelShadow + 22 ; 8 bits, loops every 8 rounds.
 
-health       .equ pixelShadow + 22
+health       .equ pixelShadow + 23
 
 hudSize      .equ lcdWidth * 32
 
@@ -66,6 +67,13 @@ prgm_start:
   ld a, lcdBpp8
   ld (mpLcdCtrl), a
   
+; clear the hud area.
+  ld hl, vRAM
+  ld de, vRAM + 1
+  ld (hl), white
+  ld bc, hudSize
+  ldir
+  
   ld hl, %1000100001110100 ; just 2 arbitrarily chosen bytes, generated with https://www.random.org/cgi-bin/randbyte?nbytes=2&format=b
   ld (rng_seed_location), hl
   
@@ -86,6 +94,9 @@ _init_nextRow:
   
   ld a, 8
   ld (health), a
+  
+  ld a, 1
+  ld (round), a
   
 ; draw health bar
   ld c, healthSegmentWidth
@@ -123,12 +134,27 @@ time_up:
   call drawFishies
   ld hl, (timerMax)
   ld (timer), hl
+  ld de, 1
+  ld a, (round)
+  rlca
+  ld (round), a
+  jr nc, mainLoop
+; if it got to here, the round counter looped and we should increase the difficulty.
+  ld de, $f0
+  sbc hl, de
+  ld (timerMax), hl
+  ld hl, multiplier
+  inc (hl)
+  ld de, vRAM
+  ld e, (hl)
+  ld a, black
+  ld (de), a
 mainLoop:
   jp movePlayer
 quit:
-  ld a, lcdBpp16 ; 16 bit
+  ld a, lcdBpp16 ; 16 bits per pixel
   ld (mpLcdCtrl), a
-  call	_DrawStatusBar
+  call  _DrawStatusBar
   ret
 movePlayer:
   ld hl, (timer)
@@ -138,7 +164,7 @@ _getKeyCode:
     call _GetCSC
   pop hl
   or a, a
-  sbc hl, de ; de=1
+  sbc hl, de ; de=1, basically a "dec hl", but it updates flags.
   jr z, time_up
   ld (timer), hl
   or a, a ; set to zero if a is zero
@@ -298,6 +324,11 @@ moveFishies:
 ; damage player
   ld hl, health
   dec (hl)
+; clear multiplier + counter
+  ld a, 1
+  ld (multiplier), a
+  ld (round), a
+; clear round counter
 ; pop off the return location so we don't have to press up to quit
   pop hl ; prettifier-no-indent-change
   jp z, quit
@@ -444,7 +475,7 @@ player_standing_sprite:
   db 009h,009h,009h,001h,001h,001h,009h,009h,009h,001h,001h,000h,000h,001h,009h,009h
   db 009h,009h,009h,000h,000h,000h,009h,009h,000h,000h,000h,000h,000h,000h,009h,009h
 prgm_end:
-.nolist
+.nolist ; prettifier-decrease-indent
 .echo "====="
 .echo "Total program size: ", prgm_end-prgm_start, " bytes"
 .echo "Code-only size: ", code_end-prgm_start, " bytes"
