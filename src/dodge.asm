@@ -41,7 +41,7 @@ healthBarOffset     .equ lcdWidth * 8 + 80
 healthSegmentWidth  .equ (2*(lcdWidth-80)/3)/8 ; 8 is health max
 healthSegmentHeight .equ 8
 
-piranhaSize  .equ 16
+snailSize  .equ 16
 
 ; palette equates
 black        .equ $00
@@ -243,24 +243,24 @@ drawSnailies:
 ; draw player
   ld a, (playerPos)
   call drawPlayer
-; draw lines
-  or a, a
-  ld bc, lineDistance
-  ld hl, lineYStart * lcdWidth + vRAM + lineDistance + lineXStart
-  ld a, lineHeight
-_lineLoopOuter:
-  push af
-    ld a,8
-_lineLoopInner:
-    ld (hl), $01 ; grey-ish
-    add hl, bc
-    dec a
-    jr nz, _lineLoopInner
-  pop af
-  add hl, bc
-  add hl, bc
-  dec a
-  jr nz, _lineLoopOuter
+; ; draw lines
+;   or a, a
+;   ld bc, lineDistance
+;   ld hl, lineYStart * lcdWidth + vRAM + lineDistance + lineXStart
+;   ld a, lineHeight
+; _lineLoopOuter:
+;   push af
+;     ld a,8
+; _lineLoopInner:
+;     ld (hl), $01 ; grey-ish
+;     add hl, bc
+;     dec a
+;     jr nz, _lineLoopInner
+;   pop af
+;   add hl, bc
+;   add hl, bc
+;   dec a
+;   jr nz, _lineLoopOuter
   ld bc, numSnailRows ; set c to numSnailRows, clear upper byte. 
 _nextRow:
   push bc
@@ -295,14 +295,14 @@ _yesSnail:
       add hl, bc
       add hl, de 
       push af
-        ld a, piranhaSize
+        ld a, snailSize
 _snailLoopOuter:
-        ld b, piranhaSize
+        ld b, snailSize
 _snailLoopInner:
         ld (hl), $02 ; red
         inc hl
         djnz _snailLoopInner
-        ld bc, lcdWidth - piranhaSize
+        ld bc, lcdWidth - snailSize
         add hl, bc
         dec a
         jr nz, _snailLoopOuter
@@ -324,11 +324,11 @@ moveSnailies:
 ; damage player
   ld hl, health
   dec (hl)
-  ; clear multiplier + counter
+; clear multiplier + counter
   ld a, 1
   ld (multiplier), a
   ld (round), a
-  ; clear round counter
+; clear round counter
 ; pop off the return location so we don't have to press up to quit
   pop hl ; prettifier-no-indent-change
   jp z, quit
@@ -475,25 +475,25 @@ player_standing_sprite:
   db 009h,009h,009h,001h,001h,001h,009h,009h,009h,001h,001h,000h,000h,001h,009h,009h
   db 009h,009h,009h,000h,000h,000h,009h,009h,000h,000h,000h,000h,000h,000h,009h,009h
 snail_sprite:
- db 009h,009h,009h,009h,009h,001h,009h,009h,009h,009h,001h,009h,009h,009h,009h,009h
- db 009h,009h,009h,009h,009h,009h,001h,009h,009h,001h,009h,009h,009h,009h,009h,009h
- db 009h,009h,009h,009h,009h,009h,001h,009h,009h,001h,009h,009h,009h,009h,009h,009h
- db 009h,009h,009h,009h,009h,009h,000h,003h,003h,000h,009h,009h,009h,009h,009h,009h
- db 009h,009h,009h,009h,009h,009h,009h,003h,003h,009h,009h,009h,009h,009h,009h,009h
- db 009h,009h,009h,009h,009h,009h,000h,000h,000h,009h,009h,009h,009h,009h,009h,009h
- db 009h,009h,009h,009h,009h,000h,001h,001h,001h,000h,009h,009h,009h,009h,009h,009h
- db 009h,009h,009h,009h,009h,000h,001h,001h,000h,000h,009h,009h,009h,009h,009h,009h
- db 009h,009h,009h,009h,009h,000h,001h,000h,001h,001h,000h,009h,009h,009h,009h,009h
- db 009h,009h,009h,009h,009h,000h,000h,001h,001h,000h,000h,009h,009h,009h,009h,009h
- db 009h,009h,009h,009h,009h,000h,001h,001h,000h,001h,000h,009h,009h,009h,009h,009h
- db 009h,009h,009h,009h,009h,009h,000h,000h,001h,000h,009h,009h,009h,009h,009h,009h
- db 009h,009h,009h,009h,009h,009h,003h,003h,000h,009h,009h,009h,009h,009h,009h,009h
- db 009h,009h,009h,009h,009h,009h,003h,003h,009h,009h,009h,009h,009h,009h,009h,009h
- db 009h,009h,009h,009h,009h,003h,003h,009h,009h,009h,009h,009h,009h,009h,009h,009h
- db 009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,001h,009h,009h,009h,009h,001h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,009h,001h,009h,009h,001h,009h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,009h,001h,009h,009h,001h,009h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,009h,000h,003h,003h,000h,009h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,009h,009h,003h,003h,009h,009h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,009h,000h,000h,000h,009h,009h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,000h,001h,001h,001h,000h,009h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,000h,001h,001h,000h,000h,009h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,000h,001h,000h,001h,001h,000h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,000h,000h,001h,001h,000h,000h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,000h,001h,001h,000h,001h,000h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,009h,000h,000h,001h,000h,009h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,009h,003h,003h,000h,009h,009h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,009h,003h,003h,009h,009h,009h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,003h,003h,009h,009h,009h,009h,009h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h
 prgm_end:
-  .nolist ; prettifier-decrease-indent
-  .echo "====="
-  .echo "Total program size: ", prgm_end-prgm_start, " bytes"
-  .echo "Code-only size: ", code_end-prgm_start, " bytes"
-  .echo "====="
+.nolist ; prettifier-decrease-indent
+.echo "====="
+.echo "Total program size: ", prgm_end-prgm_start, " bytes"
+.echo "Code-only size: ", code_end-prgm_start, " bytes"
+.echo "====="
