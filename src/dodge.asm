@@ -41,15 +41,20 @@ healthBarOffset     .equ lcdWidth * 8 + 80
 healthSegmentWidth  .equ (2*(lcdWidth-80)/3)/8 ; 8 is health max
 healthSegmentHeight .equ 8
 
-snailSize  .equ 16
+snailHeight  .equ 15
+snailWidth   .equ 6
+snailXOffset .equ 4
 
 ; palette equates
 black        .equ $00
 white        .equ $09
 green        .equ $0a
 
-playerHeight .equ 37 ; yeah it's a weird number, but it's what I ended up with.
-playerWidth  .equ 16
+; If I'm subtracting, it means I shaved off a row/column
+playerHeight .equ 37 - 1 ; yeah it's a weird number, but it's what I ended up with.
+playerWidth  .equ 16 - 2
+
+spriteCenteringConstant .equ 8
 .list
   
   .org UserMem-2
@@ -193,13 +198,8 @@ redrawPlayer:
 ; previous position in b
   push af
     ld a, b
-    call a_log_2
-    ld d, lineDistance
-    mlt de
-    ld hl, (lineYStart - playerHeight - 4) * lcdWidth + vRAM + lineXStart - 8 ; playerwidth/2
-    add hl, de
+    call playerPosConvert
     ld de, lcdWidth - playerWidth
-    ld a, playerHeight
 playerEraseOuter:
     ld b, playerWidth
 playerEraseInner:
@@ -211,12 +211,7 @@ playerEraseInner:
     jr nz, playerEraseOuter
   pop af
 drawPlayer:
-  call a_log_2
-  ld d, lineDistance
-  mlt de
-  ld hl, (lineYStart - playerHeight - 4) * lcdWidth + vRAM + lineXStart - 8 ; playerwidth/2
-  add hl, de
-  ld a, playerHeight
+  call playerPosConvert
   ld de, player_standing_sprite
   ex de, hl
 playerDrawLoop:
@@ -229,8 +224,32 @@ playerDrawLoop:
   dec a
   jr nz, playerDrawLoop
   ret
+playerPosConvert:
+; converts the playerPos into a position in vRAM
+; inputs:
+;   playerPos in a
+; results:
+;   hl = pointer to player location in vRAM
+;   de destroyed
+;   a = playerHeight
   
-  
+_a_log_2:
+; gets a log_2, assuming a is of the form 2^n
+; output in e, because it's used as part of a subroutine.
+; corrupts de
+  push af
+  ld e,$00
+  inc e
+  rrca 
+  jr nc,$-2
+  pop af 
+; </a_log_2>
+  ld d, lineDistance
+  mlt de
+  ld hl, (lineYStart - playerHeight - 4) * lcdWidth + vRAM + lineXStart - spriteCenteringConstant
+  add hl, de
+  ld a, playerHeight
+  ret
 drawSnailies:
 ; draws our cute bloodthirsty monsters
 ; just like them, it destroys everything.
@@ -293,24 +312,24 @@ _yesSnail:
       push de
         ld c, lineDistance
         mlt bc
-        ld hl, lineYStart * lcdWidth + vRAM + (lineXStart - 8)
+        ld hl, lineYStart * lcdWidth + vRAM + (lineXStart - spriteCenteringConstant) + snailXOffset
         add hl, bc
         add hl, de
         ex de, hl
         ld bc, 0
         push af
           ld hl, snail_sprite
-          ld a, snailSize
-_snailLoopOuter:
-          ld c, snailSize
+          ld a, snailHeight
+_snailLoop:
+          ld c, snailWidth
           ldir
-          ld bc, lcdWidth - snailSize
+          ld bc, lcdWidth - snailWidth
           ex de, hl
           add hl, bc
           ex de, hl
           ld b, 0
           dec a
-          jr nz, _snailLoopOuter
+          jr nz, _snailLoop
         pop af
       pop de
     pop bc
@@ -419,14 +438,6 @@ _:
   ret nz
   xor a, a
   ret
-a_log_2:
-  push af
-    ld e,$00
-    inc e
-    rrca 
-    jr nc,$-2 
-  pop af
-  ret
 code_end:
 ; code ends here, sprite stuff starts here. All of this was converted with ConvPNG
 palette:
@@ -443,60 +454,58 @@ palette:
   dw 001E0h ; 0a :: rgb(0,255,0)
 _palette_end:
 player_standing_sprite:
-  db 009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,006h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,009h,007h,006h,006h,006h,006h,006h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,007h,007h,007h,007h,007h,006h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,007h,007h,001h,001h,001h,001h,001h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,007h,001h,009h,009h,001h,009h,009h,001h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,003h,001h,009h,000h,001h,000h,009h,001h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,003h,001h,001h,001h,001h,001h,001h,001h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,003h,001h,001h,000h,000h,000h,001h,001h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,001h,000h,002h,002h,000h,001h,003h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,003h,001h,001h,001h,001h,003h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,009h,003h,003h,003h,003h,009h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,005h,005h,002h,003h,003h,002h,002h,009h,009h,009h,009h,009h
-  db 009h,009h,005h,005h,002h,002h,002h,002h,002h,002h,002h,005h,005h,009h,009h,009h
-  db 009h,005h,002h,002h,002h,002h,002h,002h,002h,002h,002h,002h,002h,005h,009h,009h
-  db 009h,002h,002h,002h,002h,002h,002h,002h,002h,002h,002h,002h,002h,002h,009h,009h
-  db 009h,002h,002h,005h,002h,002h,002h,002h,002h,002h,002h,005h,002h,002h,009h,009h
-  db 009h,002h,002h,005h,002h,002h,002h,002h,002h,002h,002h,005h,002h,002h,009h,009h
-  db 009h,002h,002h,005h,002h,002h,002h,002h,002h,002h,002h,005h,002h,002h,009h,009h
-  db 009h,002h,002h,005h,002h,002h,005h,005h,005h,002h,002h,005h,002h,002h,009h,009h
-  db 009h,002h,002h,005h,002h,005h,002h,002h,002h,005h,002h,005h,002h,002h,009h,009h
-  db 009h,002h,002h,005h,002h,005h,005h,005h,005h,005h,002h,005h,002h,002h,009h,009h
-  db 009h,002h,002h,005h,002h,002h,002h,002h,002h,002h,002h,005h,002h,002h,009h,009h
-  db 009h,002h,002h,009h,008h,004h,004h,004h,004h,004h,004h,009h,002h,002h,009h,009h
-  db 009h,003h,003h,009h,008h,004h,004h,004h,004h,004h,004h,009h,003h,003h,009h,009h
-  db 009h,001h,001h,003h,008h,004h,004h,004h,004h,004h,004h,003h,001h,001h,009h,009h
-  db 009h,003h,001h,009h,008h,004h,004h,009h,004h,004h,004h,009h,003h,003h,009h,009h
-  db 009h,009h,009h,009h,008h,004h,009h,009h,009h,004h,004h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,001h,001h,009h,009h,009h,003h,001h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,001h,001h,009h,009h,009h,003h,001h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,001h,003h,009h,009h,009h,003h,001h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,001h,003h,009h,009h,009h,003h,001h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,001h,003h,009h,009h,009h,003h,001h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,001h,003h,009h,009h,009h,003h,001h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,000h,000h,009h,009h,009h,003h,001h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,001h,001h,001h,009h,009h,009h,001h,001h,000h,000h,001h,009h,009h
-  db 009h,009h,009h,000h,000h,000h,009h,009h,000h,000h,000h,000h,000h,000h,009h,009h
+  db 009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,006h,009h
+  db 009h,009h,009h,009h,009h,009h,007h,006h,006h,006h,006h,006h,009h,009h
+  db 009h,009h,009h,009h,009h,007h,007h,007h,007h,007h,006h,009h,009h,009h
+  db 009h,009h,009h,009h,007h,007h,001h,001h,001h,001h,001h,009h,009h,009h
+  db 009h,009h,009h,009h,007h,001h,009h,009h,001h,009h,009h,001h,009h,009h
+  db 009h,009h,009h,009h,003h,001h,009h,000h,001h,000h,009h,001h,009h,009h
+  db 009h,009h,009h,009h,003h,001h,001h,001h,001h,001h,001h,001h,009h,009h
+  db 009h,009h,009h,009h,003h,001h,001h,000h,000h,000h,001h,001h,009h,009h
+  db 009h,009h,009h,009h,009h,001h,000h,002h,002h,000h,001h,003h,009h,009h
+  db 009h,009h,009h,009h,009h,003h,001h,001h,001h,001h,003h,009h,009h,009h
+  db 009h,009h,009h,009h,009h,009h,003h,003h,003h,003h,009h,009h,009h,009h
+  db 009h,009h,009h,009h,005h,005h,002h,003h,003h,002h,002h,009h,009h,009h
+  db 009h,009h,005h,005h,002h,002h,002h,002h,002h,002h,002h,005h,005h,009h
+  db 009h,005h,002h,002h,002h,002h,002h,002h,002h,002h,002h,002h,002h,005h
+  db 009h,002h,002h,002h,002h,002h,002h,002h,002h,002h,002h,002h,002h,002h
+  db 009h,002h,002h,005h,002h,002h,002h,002h,002h,002h,002h,005h,002h,002h
+  db 009h,002h,002h,005h,002h,002h,002h,002h,002h,002h,002h,005h,002h,002h
+  db 009h,002h,002h,005h,002h,002h,002h,002h,002h,002h,002h,005h,002h,002h
+  db 009h,002h,002h,005h,002h,002h,005h,005h,005h,002h,002h,005h,002h,002h
+  db 009h,002h,002h,005h,002h,005h,002h,002h,002h,005h,002h,005h,002h,002h
+  db 009h,002h,002h,005h,002h,005h,005h,005h,005h,005h,002h,005h,002h,002h
+  db 009h,002h,002h,005h,002h,002h,002h,002h,002h,002h,002h,005h,002h,002h
+  db 009h,002h,002h,009h,008h,004h,004h,004h,004h,004h,004h,009h,002h,002h
+  db 009h,003h,003h,009h,008h,004h,004h,004h,004h,004h,004h,009h,003h,003h
+  db 009h,001h,001h,003h,008h,004h,004h,004h,004h,004h,004h,003h,001h,001h
+  db 009h,003h,001h,009h,008h,004h,004h,009h,004h,004h,004h,009h,003h,003h
+  db 009h,009h,009h,009h,008h,004h,009h,009h,009h,004h,004h,009h,009h,009h
+  db 009h,009h,009h,009h,001h,001h,009h,009h,009h,003h,001h,009h,009h,009h
+  db 009h,009h,009h,009h,001h,001h,009h,009h,009h,003h,001h,009h,009h,009h
+  db 009h,009h,009h,009h,001h,003h,009h,009h,009h,003h,001h,009h,009h,009h
+  db 009h,009h,009h,009h,001h,003h,009h,009h,009h,003h,001h,009h,009h,009h
+  db 009h,009h,009h,009h,001h,003h,009h,009h,009h,003h,001h,009h,009h,009h
+  db 009h,009h,009h,009h,001h,003h,009h,009h,009h,003h,001h,009h,009h,009h
+  db 009h,009h,009h,009h,000h,000h,009h,009h,009h,003h,001h,009h,009h,009h
+  db 009h,009h,009h,001h,001h,001h,009h,009h,009h,001h,001h,000h,000h,001h
+  db 009h,009h,009h,000h,000h,000h,009h,009h,000h,000h,000h,000h,000h,000h
 snail_sprite:
-  db 009h,009h,009h,009h,009h,001h,009h,009h,009h,009h,001h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,009h,001h,009h,009h,001h,009h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,009h,001h,009h,009h,001h,009h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,009h,000h,003h,003h,000h,009h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,009h,009h,003h,003h,009h,009h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,009h,000h,000h,000h,009h,009h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,000h,001h,001h,001h,000h,009h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,000h,001h,001h,000h,000h,009h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,000h,001h,000h,001h,001h,000h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,000h,000h,001h,001h,000h,000h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,000h,001h,001h,000h,001h,000h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,009h,000h,000h,001h,000h,009h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,009h,003h,003h,000h,009h,009h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,009h,003h,003h,009h,009h,009h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,003h,003h,009h,009h,009h,009h,009h,009h,009h,009h,009h
-  db 009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h
+  db 001h,009h,009h,009h,009h,001h
+  db 009h,001h,009h,009h,001h,009h
+  db 009h,001h,009h,009h,001h,009h
+  db 009h,000h,003h,003h,000h,009h
+  db 009h,009h,003h,003h,009h,009h
+  db 009h,000h,000h,000h,009h,009h
+  db 000h,001h,001h,001h,000h,009h
+  db 000h,001h,001h,000h,000h,009h
+  db 000h,001h,000h,001h,001h,000h
+  db 000h,000h,001h,001h,000h,000h
+  db 000h,001h,001h,000h,001h,000h
+  db 009h,000h,000h,001h,000h,009h
+  db 009h,003h,003h,000h,009h,009h
+  db 009h,003h,003h,009h,009h,009h
+  db 003h,003h,009h,009h,009h,009h
 prgm_end:
 .nolist ; prettifier-decrease-indent
 .echo "====="
