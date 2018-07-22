@@ -506,6 +506,7 @@ snail_sprite:
   db 009h,003h,003h,000h,009h,009h
   db 009h,003h,003h,009h,009h,009h
   db 003h,003h,009h,009h,009h,009h
+#include "font.asm"
 prgm_end:
 .nolist ; prettifier-decrease-indent
 .echo "====="
