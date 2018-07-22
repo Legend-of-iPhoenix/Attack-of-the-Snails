@@ -230,6 +230,7 @@ playerDrawLoop:
   jr nz, playerDrawLoop
   ret
   
+  
 drawSnailies:
 ; draws our cute bloodthirsty monsters
 ; just like them, it destroys everything.
@@ -269,7 +270,7 @@ _nextRow:
     dec c
     add hl, bc
     ld a, (hl)
-    ld h, lcdWidth/2
+    ld hl, lcdWidth/2 * 256 ; clear hlu, set h to lcdWidth/2
     ld l, c
     mlt hl
     add hl, hl ; get rid of /2 above
@@ -289,24 +290,29 @@ _nextSnail:
     jr nc, _noSnail
 _yesSnail:
     push bc
-      ld c, lineDistance
-      mlt bc
-      ld hl, lineYStart * lcdWidth + vRAM + (lineXStart - 8)
-      add hl, bc
-      add hl, de 
-      push af
-        ld a, snailSize
-_snailLoopOuter:
-        ld b, snailSize
-_snailLoopInner:
-        ld (hl), $02 ; red
-        inc hl
-        djnz _snailLoopInner
-        ld bc, lcdWidth - snailSize
+      push de
+        ld c, lineDistance
+        mlt bc
+        ld hl, lineYStart * lcdWidth + vRAM + (lineXStart - 8)
         add hl, bc
-        dec a
-        jr nz, _snailLoopOuter
-      pop af
+        add hl, de
+        ex de, hl
+        ld bc, 0
+        push af
+          ld hl, snail_sprite
+          ld a, snailSize
+_snailLoopOuter:
+          ld c, snailSize
+          ldir
+          ld bc, lcdWidth - snailSize
+          ex de, hl
+          add hl, bc
+          ex de, hl
+          ld b, 0
+          dec a
+          jr nz, _snailLoopOuter
+        pop af
+      pop de
     pop bc
 _noSnail:
     djnz _nextSnail
@@ -415,7 +421,7 @@ _:
   ret
 a_log_2:
   push af
-    ld e,$00 
+    ld e,$00
     inc e
     rrca 
     jr nc,$-2 
