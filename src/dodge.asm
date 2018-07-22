@@ -238,10 +238,10 @@ _a_log_2:
 ; output in e, because it's used as part of a subroutine.
 ; corrupts de
   push af
-  ld e,$00
-  inc e
-  rrca 
-  jr nc,$-2
+    ld e,$00
+    inc e
+    rrca 
+    jr nc,$-2
   pop af 
 ; </a_log_2>
   ld d, lineDistance
