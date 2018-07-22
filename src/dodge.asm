@@ -9,17 +9,17 @@ lineXStart   .equ lineDistance/2
 lineYStart   .equ 100
 lineHeight   .equ lcdHeight - lineYStart
 
-fishStart    .equ pixelShadow + 1
-fishData0    .equ pixelShadow + 1 ; these hold the binary values with the fish
-fishData1    .equ pixelShadow + 2
-fishData2    .equ pixelShadow + 3
-fishData3    .equ pixelShadow + 4
-fishData4    .equ pixelShadow + 5
-fishData5    .equ pixelShadow + 6
-fishData6    .equ pixelShadow + 7
+snailStart    .equ pixelShadow + 1
+snailData0    .equ pixelShadow + 1 ; these hold the binary values with the snail
+snailData1    .equ pixelShadow + 2
+snailData2    .equ pixelShadow + 3
+snailData3    .equ pixelShadow + 4
+snailData4    .equ pixelShadow + 5
+snailData5    .equ pixelShadow + 6
+snailData6    .equ pixelShadow + 7
 
-nextFish     .equ pixelShadow + 8
-numFishRows  .equ 7 ; fishData0 to fishData6
+nextSnail     .equ pixelShadow + 8
+numSnailRows  .equ 7 ; snailData0 to snailData6
 
 playerPosOld .equ pixelShadow + 9
 playerPos    .equ pixelShadow + 10
@@ -77,8 +77,8 @@ prgm_start:
   ld hl, %1000100001110100 ; just 2 arbitrarily chosen bytes, generated with https://www.random.org/cgi-bin/randbyte?nbytes=2&format=b
   ld (rng_seed_location), hl
   
-  ld hl, fishStart
-  ld b, numFishRows
+  ld hl, snailStart
+  ld b, numSnailRows
 _init_nextRow:
   push bc
     push hl
@@ -130,8 +130,8 @@ _init_nextHealthBarLine:
   ld a, $1
   ld (playerPos), a
 time_up:
-  call moveFishies
-  call drawFishies
+  call moveSnailies
+  call drawSnailies
   ld hl, (timerMax)
   ld (timer), hl
   ld de, 1
@@ -230,7 +230,7 @@ playerDrawLoop:
   jr nz, playerDrawLoop
   ret
   
-drawFishies:
+drawSnailies:
 ; draws our cute bloodthirsty monsters
 ; just like them, it destroys everything.
   
@@ -261,10 +261,10 @@ _lineLoopInner:
   add hl, bc
   dec a
   jr nz, _lineLoopOuter
-  ld bc, numFishRows ; set c to numFishRows, clear upper byte. 
+  ld bc, numSnailRows ; set c to numSnailRows, clear upper byte. 
 _nextRow:
   push bc
-    ld hl, fishStart
+    ld hl, snailStart
     ld b, 0
     dec c
     add hl, bc
@@ -284,10 +284,10 @@ _nextRow:
     pop bc
     ex de, hl
     ld b, 8
-_nextFish:
+_nextSnail:
     rlca
-    jr nc, _noFish
-_yesFish:
+    jr nc, _noSnail
+_yesSnail:
     push bc
       ld c, lineDistance
       mlt bc
@@ -296,27 +296,27 @@ _yesFish:
       add hl, de 
       push af
         ld a, piranhaSize
-_fishLoopOuter:
+_snailLoopOuter:
         ld b, piranhaSize
-_fishLoopInner:
+_snailLoopInner:
         ld (hl), $02 ; red
         inc hl
-        djnz _fishLoopInner
+        djnz _snailLoopInner
         ld bc, lcdWidth - piranhaSize
         add hl, bc
         dec a
-        jr nz, _fishLoopOuter
+        jr nz, _snailLoopOuter
       pop af
     pop bc
-_noFish:
-    djnz _nextFish
+_noSnail:
+    djnz _nextSnail
   pop bc
   ld b, c
   dec c
   djnz _nextRow
   ret
-moveFishies:
-  ld a, (fishData0)
+moveSnailies:
+  ld a, (snailData0)
   ld b, a
   ld a, (playerPos)
   and a, b
@@ -324,11 +324,11 @@ moveFishies:
 ; damage player
   ld hl, health
   dec (hl)
-; clear multiplier + counter
+  ; clear multiplier + counter
   ld a, 1
   ld (multiplier), a
   ld (round), a
-; clear round counter
+  ; clear round counter
 ; pop off the return location so we don't have to press up to quit
   pop hl ; prettifier-no-indent-change
   jp z, quit
@@ -359,17 +359,17 @@ _:
   jr nz, -_
 doScoring:
 ; scoring
-  ld hl, fishStart
-  ld b, numFishRows + 1
+  ld hl, snailStart
+  ld b, numSnailRows + 1
   ld c, 0 ; this will be the change in score
-_scoreFish:
+_scoreSnail:
   ld a, (playerPos)
-  and (hl) ; hl is the row of fish
+  and (hl) ; hl is the row of snail
   inc hl ; this doesn't alter flags
-  jr z, _moreFish
+  jr z, _moreSnail
   inc c
-_moreFish:
-  djnz _scoreFish
+_moreSnail:
+  djnz _scoreSnail
   ld a, (multiplier)
   ld b, a
   mlt bc
@@ -377,11 +377,11 @@ _moreFish:
   add hl, bc
   ld (score), hl
   call rng
-  ld (nextFish), a
+  ld (nextSnail), a
 ; shift the rows
-  ld hl, fishData1
-  ld de, fishData0
-  ld bc, numFishRows
+  ld hl, snailData1
+  ld de, snailData0
+  ld bc, numSnailRows
   ldir
   xor a, a
   ret
@@ -474,9 +474,26 @@ player_standing_sprite:
   db 009h,009h,009h,009h,000h,000h,009h,009h,009h,003h,001h,009h,009h,009h,009h,009h
   db 009h,009h,009h,001h,001h,001h,009h,009h,009h,001h,001h,000h,000h,001h,009h,009h
   db 009h,009h,009h,000h,000h,000h,009h,009h,000h,000h,000h,000h,000h,000h,009h,009h
+snail_sprite:
+ db 009h,009h,009h,009h,009h,001h,009h,009h,009h,009h,001h,009h,009h,009h,009h,009h
+ db 009h,009h,009h,009h,009h,009h,001h,009h,009h,001h,009h,009h,009h,009h,009h,009h
+ db 009h,009h,009h,009h,009h,009h,001h,009h,009h,001h,009h,009h,009h,009h,009h,009h
+ db 009h,009h,009h,009h,009h,009h,000h,003h,003h,000h,009h,009h,009h,009h,009h,009h
+ db 009h,009h,009h,009h,009h,009h,009h,003h,003h,009h,009h,009h,009h,009h,009h,009h
+ db 009h,009h,009h,009h,009h,009h,000h,000h,000h,009h,009h,009h,009h,009h,009h,009h
+ db 009h,009h,009h,009h,009h,000h,001h,001h,001h,000h,009h,009h,009h,009h,009h,009h
+ db 009h,009h,009h,009h,009h,000h,001h,001h,000h,000h,009h,009h,009h,009h,009h,009h
+ db 009h,009h,009h,009h,009h,000h,001h,000h,001h,001h,000h,009h,009h,009h,009h,009h
+ db 009h,009h,009h,009h,009h,000h,000h,001h,001h,000h,000h,009h,009h,009h,009h,009h
+ db 009h,009h,009h,009h,009h,000h,001h,001h,000h,001h,000h,009h,009h,009h,009h,009h
+ db 009h,009h,009h,009h,009h,009h,000h,000h,001h,000h,009h,009h,009h,009h,009h,009h
+ db 009h,009h,009h,009h,009h,009h,003h,003h,000h,009h,009h,009h,009h,009h,009h,009h
+ db 009h,009h,009h,009h,009h,009h,003h,003h,009h,009h,009h,009h,009h,009h,009h,009h
+ db 009h,009h,009h,009h,009h,003h,003h,009h,009h,009h,009h,009h,009h,009h,009h,009h
+ db 009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h,009h
 prgm_end:
-.nolist ; prettifier-decrease-indent
-.echo "====="
-.echo "Total program size: ", prgm_end-prgm_start, " bytes"
-.echo "Code-only size: ", code_end-prgm_start, " bytes"
-.echo "====="
+  .nolist ; prettifier-decrease-indent
+  .echo "====="
+  .echo "Total program size: ", prgm_end-prgm_start, " bytes"
+  .echo "Code-only size: ", code_end-prgm_start, " bytes"
+  .echo "====="
