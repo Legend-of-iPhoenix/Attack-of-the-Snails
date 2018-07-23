@@ -45,6 +45,8 @@ snailHeight  .equ 15
 snailWidth   .equ 6
 snailXOffset .equ 4
 
+glyphHeight  .equ 12
+
 ; palette equates
 black        .equ $00
 white        .equ $09
@@ -62,6 +64,29 @@ spriteCenteringConstant .equ 8
 prgm_start:
   call _RunIndicOff ; we'll clear vRAM later
   
+; initialize font:
+  ld hl, pixelShadow2-1
+  ld de, _font_start-1
+  ld bc, _font_end-_font_start
+  inc b
+_init_font__next_byte:
+  push bc
+    inc de
+    ld a, (de)
+    ld b, $8
+_init_font__next_bit:
+    inc hl
+    ld (hl), white
+    rlca
+    jr nc, _
+    ld (hl), black
+_:
+    djnz _init_font__next_bit
+  pop bc
+  dec c
+  jr nz, _init_font__next_byte
+  djnz _init_font__next_byte
+  
 ; <init palette>
   ld hl, palette
   ld de, mpLcdPalette
@@ -78,6 +103,38 @@ prgm_start:
   ld (hl), white
   ld bc, hudSize
   ldir
+  
+; test that my decompression works by drawing the letter "A".
+; most of this is just there because we are drawing a 
+; single character, the code to draw a string isn't that much different.
+  ld a, (_char_start+0) ; 0 = index of "A" in _char_lookup, easily done with a cpir
+  sub $0a ; width of "a", this is unnecessary with good programming
+  ld h, a
+  ld l, glyphHeight
+  mlt hl
+  or a, a
+  ld bc, pixelShadow2
+  adc hl, bc
+  ld bc, glyphHeight * 256 ; bcu=0; c=0; b=glyphHeight
+  ld de, vRAM
+_init_next_char_row:
+  push bc
+    ld b, 0
+    ld a, (_char_widths+0)
+    ld c, a ; b=0, bcu=0
+    ldir
+    push hl
+      ex de, hl
+      ld de, lcdWidth
+      add hl, de
+      ld c, a
+      or a, a
+      sbc hl, bc
+      ex de, hl
+    pop hl
+  pop bc
+  djnz _init_next_char_row
+  
   
   ld hl, %1000100001110100 ; just 2 arbitrarily chosen bytes, generated with https://www.random.org/cgi-bin/randbyte?nbytes=2&format=b
   ld (rng_seed_location), hl
@@ -506,7 +563,7 @@ snail_sprite:
   db 009h,003h,003h,000h,009h,009h
   db 009h,003h,003h,009h,009h,009h
   db 003h,003h,009h,009h,009h,009h
-#include "font.asm"
+  #include "font.asm"
 prgm_end:
 .nolist ; prettifier-decrease-indent
 .echo "====="
