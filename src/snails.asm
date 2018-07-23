@@ -35,6 +35,8 @@ round        .equ pixelShadow + 22 ; 8 bits, loops every 8 rounds.
 
 health       .equ pixelShadow + 23
 
+curCharWidth .equ pixelShadow + 24 ; 24 bits, used in font routine
+
 hudSize      .equ lcdWidth * 32
 
 healthBarOffset     .equ lcdWidth * 8 + 80
@@ -46,6 +48,7 @@ snailWidth   .equ 6
 snailXOffset .equ 4
 
 glyphHeight  .equ 12
+glyphSpacing .equ 1
 
 ; palette equates
 black        .equ $00
@@ -103,37 +106,19 @@ _:
   ld (hl), white
   ld bc, hudSize
   ldir
-
-; test that my decompression works by drawing the letter "A".
-; most of this is just there because we are drawing a 
-; single character, the code to draw a string isn't that much different.
-  ld a, (_char_start+0) ; 0 = index of "A" in _char_lookup, easily done with a cpir
-  sub $0a
-  ld h, a
-  ld l, glyphHeight
-  mlt hl
-  or a, a
-  ld bc, pixelShadow2
-  adc hl, bc
-  ld bc, glyphHeight * 256 ; bcu=0; c=0; b=glyphHeight
-  ld de, vRAM
-_init_next_char_row:
+  
+  ld hl, _text_title_start
+  ld de, OP1
+  ld bc, _text_title_end-_text_title_start
+  ldir
+  
   push bc
-    ld b, 0
-    ld a, (_char_widths+0)
-    ld c, a ; b=0, bcu=0
-    ldir
-    push hl
-      ex de, hl
-      ld de, lcdWidth
-      add hl, de
-      ld c, a
-      or a, a
-      sbc hl, bc
-      ex de, hl
-    pop hl
-  pop bc
-  djnz _init_next_char_row
+  pop hl ; hl=0
+  ld e, 0
+  
+  ld b, _text_title_end-_text_title_start
+  
+  call draw_text
   
   
   ld hl, %1000100001110100 ; just 2 arbitrarily chosen bytes, generated with https://www.random.org/cgi-bin/randbyte?nbytes=2&format=b
@@ -494,6 +479,80 @@ _:
   inc c
   ret nz
   xor a, a
+  ret
+draw_text:
+; draws text to the screen using the custom font.
+; text in OP1, length in b
+; text should be reversed! (i.e. "ABC" in OP1 draws as "CBA" on-screen)
+; position is (hl, e), zero-indexed to the top left of the screen
+; position = top left of character
+  ld d, lcdWidth/2
+  mlt de
+  ex de, hl
+  add hl, hl
+  add hl, de
+  ld de, vRAM
+  add hl, de
+  ex de, hl ; de = position in vRAM
+_draw_next_char:
+  push bc
+    push de
+        ld c, b
+        ld b, 0
+        ld hl, OP1
+    dec hl
+        add hl, bc
+        ld c, (hl)
+        push bc
+        pop hl
+        ld (curCharWidth), hl
+        ld h, 17*8
+    mlt hl
+      ld bc, pixelShadow2
+      add hl, bc
+      ld bc, glyphHeight * 256 ; bcu=0; c=0; b=glyphHeight
+    pop de
+_next_char_row:
+    push bc
+      ld b, 0
+      push hl
+        push bc
+          ld hl, (curCharWidth)
+          ld bc, _char_widths
+          add hl, bc
+        pop bc
+    ld a, (hl)
+        ld c, a
+      pop hl
+      ldir
+      push hl
+        ex de, hl
+        ld de, lcdWidth
+        add hl, de
+        ld c, a
+        or a, a
+        sbc hl, bc
+        ex de, hl
+      pop hl
+    pop bc
+    djnz _next_char_row
+    or a, a
+    ld bc, lcdWidth * glyphHeight - glyphSpacing
+    push hl
+      push bc
+      pop hl
+      ld b, 0
+      ld c, a
+      or a, a
+      sbc hl, bc
+      push hl
+      pop bc
+    pop hl
+    ex de, hl
+    sbc hl, bc
+    ex de, hl
+  pop bc
+  djnz _draw_next_char
   ret
 code_end:
 ; code ends here, sprite stuff starts here. All of this was converted with ConvPNG
