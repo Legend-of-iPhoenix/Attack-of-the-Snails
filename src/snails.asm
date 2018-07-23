@@ -45,8 +45,6 @@ snailHeight  .equ 15
 snailWidth   .equ 6
 snailXOffset .equ 4
 
-glyphHeight  .equ 12
-
 ; palette equates
 black        .equ $00
 white        .equ $09
@@ -104,18 +102,15 @@ _:
   ld bc, hudSize
   ldir
   
-; test that my decompression works by drawing the letter "A".
-; most of this is just there because we are drawing a 
-; single character, the code to draw a string isn't that much different.
-  ld a, (_char_start+0) ; 0 = index of "A" in _char_lookup, easily done with a cpir
-  sub $0a ; width of "a", this is unnecessary with good programming
+  ld a, (_char_start+0)
+  sub $0a
   ld h, a
-  ld l, glyphHeight
+  ld l, 12
   mlt hl
   or a, a
   ld bc, pixelShadow2
   adc hl, bc
-  ld bc, glyphHeight * 256 ; bcu=0; c=0; b=glyphHeight
+  ld bc, 12 * 256 ; bcu=0; c=0; b=12
   ld de, vRAM
 _init_next_char_row:
   push bc
