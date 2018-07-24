@@ -1,5 +1,6 @@
 .nolist
 #include "ti84pce.inc"
+#include "macros.asm"
 #define dw .dw ; convpng -> compiler compatibility
 #define db .db
 
