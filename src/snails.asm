@@ -30,13 +30,14 @@ rng_seed_location .equ pixelShadow + 11
 timerMax     .equ pixelShadow + 12
 timer        .equ pixelShadow + 15
 
-score        .equ pixelShadow + 18
+score        .equ pixelShadow + 18 ; 24 bits
 multiplier   .equ pixelShadow + 21
 round        .equ pixelShadow + 22 ; 8 bits, loops every 8 rounds.
 
 health       .equ pixelShadow + 23
 
-curCharWidth .equ pixelShadow + 24 ; 24 bits, used in font routine
+tempStorage  .equ pixelShadow + 24 ; 24 bits, used in font routine
+numberChars  .equ $d05abe ; pixelShadow2 + (_font_numbers-_font_start)*8 ; contains the location in memory of the expanded versions of the number characters
 
 hudSize      .equ lcdWidth * 32
 
@@ -108,18 +109,17 @@ _:
   ld bc, hudSize
   ldir
   
-  ld hl, _text_title_start
-  ld de, OP1
-  ld bc, _text_title_end-_text_title_start
-  ldir
-  
-  push bc
-  pop hl ; hl=0
-  ld e, 0
-  
-  ld b, _text_title_end-_text_title_start
-  
-  call draw_text
+;    ld hl, _text_title_start
+;    ld de, OP1
+;    ld bc, _text_title_end-_text_title_start
+;    ldir
+;    push bc
+;    pop hl ; hl=0
+;    ld e, 0
+;    
+;    ld b, _text_title_end-_text_title_start
+;    
+;    call draw_text
   
   
   ld hl, %1000100001110100 ; just 2 arbitrarily chosen bytes, generated with https://www.random.org/cgi-bin/randbyte?nbytes=2&format=b
@@ -306,24 +306,6 @@ drawSnailies:
 ; draw player
   ld a, (playerPos)
   call drawPlayer
-; ; draw lines
-;   or a, a
-;   ld bc, lineDistance
-;   ld hl, lineYStart * lcdWidth + vRAM + lineDistance + lineXStart
-;   ld a, lineHeight
-; _lineLoopOuter:
-;   push af
-;     ld a,8
-; _lineLoopInner:
-;     ld (hl), $01 ; grey-ish
-;     add hl, bc
-;     dec a
-;     jr nz, _lineLoopInner
-;   pop af
-;   add hl, bc
-;   add hl, bc
-;   dec a
-;   jr nz, _lineLoopOuter
   ld bc, numSnailRows ; set c to numSnailRows, clear upper byte. 
 _nextRow:
   push bc
@@ -444,6 +426,15 @@ _moreSnail:
   ld hl, (score)
   add hl, bc
   ld (score), hl
+  push bc
+  push de
+  push hl
+  pop bc
+  ld a, 0
+  ld de, 0
+  call drawScore
+  pop de
+  pop bc
   call rng
   ld (nextSnail), a
 ; shift the rows
@@ -487,6 +478,7 @@ draw_text:
 ; text should be reversed! (i.e. "ABC" in OP1 draws as "CBA" on-screen)
 ; position is (hl, e), zero-indexed to the top left of the screen
 ; position = top left of character
+; uses SnailFont
   ld d, lcdWidth/2
   mlt de
   ex de, hl
@@ -498,17 +490,17 @@ draw_text:
 _draw_next_char:
   push bc
     push de
-        ld c, b
-        ld b, 0
-        ld hl, OP1
-    dec hl
-        add hl, bc
-        ld c, (hl)
-        push bc
-        pop hl
-        ld (curCharWidth), hl
-        ld h, 17*8
-    mlt hl
+      ld c, b
+      ld b, 0
+      ld hl, OP1
+      dec hl
+      add hl, bc
+      ld c, (hl)
+      push bc
+      pop hl
+      ld (tempStorage), hl
+      ld h, 17*8
+      mlt hl
       ld bc, pixelShadow2
       add hl, bc
       ld bc, glyphHeight * 256 ; bcu=0; c=0; b=glyphHeight
@@ -518,11 +510,11 @@ _next_char_row:
       ld b, 0
       push hl
         push bc
-          ld hl, (curCharWidth)
+          ld hl, (tempStorage)
           ld bc, _char_widths
           add hl, bc
         pop bc
-    ld a, (hl)
+        ld a, (hl)
         ld c, a
       pop hl
       ldir
@@ -555,6 +547,86 @@ _next_char_row:
   pop bc
   djnz _draw_next_char
   ret
+drawScore:
+; draws the decimal equivalent of the number in bc, 
+; padded with zeros to be exactly 4 digits long
+; position is (de, a), zero-indexed to the top left of the screen
+; position = top left of character
+; uses SnailFont
+  ld l, a
+  ld h, lcdWidth/2
+  mlt hl
+  add hl, hl
+  add hl, de
+  ld de, vRAM
+  add hl, de
+  ex de, hl
+  push de
+; bc -> OP1
+    push bc
+    pop hl
+    ld b, 4
+_calculateNextDigit:
+    call _DivHLBy10_s
+    ld d, a
+    ld e, 12 ; size of each char, in bytes
+    mlt de
+    push hl
+      push bc
+        push af
+          ld a, 5
+          sub b
+          ld b, a
+          call _OP1plusB
+        pop af
+      pop bc
+      ld (hl), e
+    pop hl
+    djnz _calculateNextDigit
+  pop de
+  ld b, 4
+_loadNextNumber:
+  call _OP1plusB
+  push bc
+    ld c, (hl)
+    ld b, 8
+    mlt bc ; bits->bytes
+    ld hl, numberChars
+    add hl, bc ; hl = location of expanded char in memory
+    ld b, glyphHeight
+_drawNextNumberRow:
+    push bc
+      ld bc, 8
+      ldir
+      push hl
+        ex de, hl
+        ld de, lcdWidth-8 ; 8 = number width
+        add hl, de
+        ex de, hl
+      pop hl
+    pop bc
+    djnz _drawNextNumberRow
+_nextNumber:
+    ld bc, (glyphHeight - 1) * lcdWidth - glyphSpacing + lcdWidth - 8
+    ex de, hl
+    or a, a
+    sbc hl, bc
+    ex de, hl
+  pop bc
+  djnz _loadNextNumber
+  ret
+_OP1plusB:
+; gets the position of the Bth char in OP1, and puts it into hl.
+; preserves bc
+  ld hl, OP1
+  push bc
+    ld c, b
+    ld b, 0
+    add hl, bc
+  pop bc
+  ret
+  
+  
 code_end:
 ; code ends here, sprite stuff starts here. All of this was converted with ConvPNG
 palette:

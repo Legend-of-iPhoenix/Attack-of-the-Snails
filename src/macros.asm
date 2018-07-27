@@ -1,4 +1,4 @@
-; these came from a nice omnimaga article, I modified the last one to fit my needs better.
+; these came from a nice omnimaga article, I modified them to fit my needs better.
 
 
 ;Example usage:
@@ -76,16 +76,12 @@
   zconvhex(zn)
 #endmacro
 
-#macro BREAKPOINT
+#macro breakpoint(name)
  #ifndef BREAK_F
   .echo "=== Breakpoints: ==="
-  .echo convhex($)
+  .echo name, ": ", convhex($)
   #define BREAK_F
  #else
-  .echo convhex($)
+  .echo name, ": ", convhex($)
  #endif
 #endmacro
-
-;Alternatives to break macro name
-#define breakpoint() BREAKPOINT
-#define .breakpoint BREAKPOINT
