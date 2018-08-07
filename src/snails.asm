@@ -37,8 +37,6 @@ round        .equ pixelShadow + 22 ; 8 bits, loops every 8 rounds.
 health       .equ pixelShadow + 23
 
 tempStorage  .equ pixelShadow + 24 ; 24 bits, used in font routine
-numberChars  .equ $d05abe ; pixelShadow2 + (_font_numbers-_font_start)*8 ; contains the location in memory of the expanded versions of the number characters
-
 hudSize      .equ lcdWidth * 32
 
 healthBarOffset     .equ lcdWidth * 8 + 80
@@ -67,6 +65,7 @@ spriteCenteringConstant .equ 8
   .org UserMem-2
   .db tExtTok,tAsm84CeCmp
 prgm_start:
+init:
   call _RunIndicOff ; we'll clear vRAM later
   
 ; initialize font:
@@ -101,26 +100,45 @@ _:
   
   ld a, lcdBpp8
   ld (mpLcdCtrl), a
+main_menu:
+  ld hl, vRAM
+  ld de, vRAM+1
+  ld bc, lcdWidth * lcdHeight - 1
+  ld (hl), white
+  ldir
   
+  ld hl, _text_title_start
+  ld bc, _text_title_end-_text_title_start
+  call load_text
+  ld hl, (lcdWidth-_text_title_width)/2
+  ld e, 0   
+  call draw_text
+  
+  ld hl, _text_play_start
+  ld bc, _text_play_end-_text_play_start
+  call load_text
+  ld hl, (lcdWidth/2)-_text_play_width
+  ld e, 64
+  call draw_text
+  
+  ld hl, _text_credits_start
+  ld bc, _text_credits_end-_text_credits_start
+  call load_text
+  ld hl, 0
+  ld e, lcdHeight-12
+  call draw_text
+  
+_menu_key_wait:
+  call _GetCSC
+  or a, a
+  jr z, _menu_key_wait
+menu_end:
 ; clear the hud area.
   ld hl, vRAM
   ld de, vRAM + 1
   ld (hl), white
   ld bc, hudSize
   ldir
-  
-;    ld hl, _text_title_start
-;    ld de, OP1
-;    ld bc, _text_title_end-_text_title_start
-;    ldir
-;    push bc
-;    pop hl ; hl=0
-;    ld e, 0
-;    
-;    ld b, _text_title_end-_text_title_start
-;    
-;    call draw_text
-  
   
   ld hl, %1000100001110100 ; just 2 arbitrarily chosen bytes, generated with https://www.random.org/cgi-bin/randbyte?nbytes=2&format=b
   ld (rng_seed_location), hl
@@ -137,7 +155,7 @@ _init_nextRow:
   pop bc
   djnz _init_nextRow
   
-  ld hl, $60ff
+  ld hl, $4000
   ld (timerMax), hl
   
   ld a, 8
@@ -427,13 +445,13 @@ _moreSnail:
   add hl, bc
   ld (score), hl
   push bc
-  push de
-  push hl
-  pop bc
-  ld a, 0
-  ld de, 0
-  call drawScore
-  pop de
+    push de
+      push hl
+      pop bc
+      ld a, 0
+      ld de, 0
+      call drawScore
+    pop de
   pop bc
   call rng
   ld (nextSnail), a
@@ -471,6 +489,17 @@ _:
   inc c
   ret nz
   xor a, a
+  ret
+load_text:
+; loads text into op1
+; length in bc
+; pointer to start of text in hl
+; destroys de, hl=hl+bc, b = length of text
+  push bc
+    ld de, OP1
+    ldir
+  pop bc
+  ld b, c
   ret
 draw_text:
 ; draws text to the screen using the custom font.
@@ -591,7 +620,7 @@ _loadNextNumber:
     ld c, (hl)
     ld b, 8
     mlt bc ; bits->bytes
-    ld hl, numberChars
+    ld hl, numberCharsOffset+pixelShadow2
     add hl, bc ; hl = location of expanded char in memory
     ld b, glyphHeight
 _drawNextNumberRow:
