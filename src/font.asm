@@ -4,13 +4,16 @@
 ; numbers:
 ; "0123456789"
 ; to get known chars:
-; .match(/_char_(?:lower|upper|other)_([^:]+)/g).map(x=>x.match(/_([^_]+)$/)[1]).map(x=>x.length==1?x:{space: ' ', underscore: '_'}[x]).join('')
+; .match(/_char_(?:lower|upper|other)_([^:]+)/g).map(x=>x.match(/_([^_]+)$/)[1]).map(x=>x.length==1?x:{space: ' ', underscore: '_', greaterthan: '>'}[x]).join('')
 ; to get char widths:
 ; .match(/; db [01]+/g).filter((a,b)=>!(b%12)).map(x=>'$'+x.match(/[01]+/g)[0].length.toString(16).padStart(2,0)).join(',')
 ; to convert binary data to hex for .db
 ; .match(/[01]+/g).join('').match(/[01]{1,8}/g).map(x=>'$'+parseInt(x,2).toString(16).padStart(2,0)).join(',')
+; convpng -> binary: (only the part with the db's)
+; .replace(/000h,?/g,1).replace(/00Bh,?/g,0).split("\n").map(r=>r.substring(4).split("")),r=(r=>{for(i in b=[],r[0]){b.push(r.map(r=>r[i]).reverse())}return b}),b=r(a).map(r=>r.join("")),v=(r=>(f=!0,r.map((e,p)=>(f=r[p]=="0".repeat(12)&f)?"":e).reverse())),b=r(v(v(b)).map(r=>r.split("")).filter(r=>r.length)).map(r=>'; db '+r.join("")).join("\n");
+; the above are JS tools I wrote to assist in conversion from convpng output to my 1bpp format.
 _char_widths:
-  .db $0a,$08,$07,$05,$08,$09,$09,$08,$0b,$07,$09,$05,$07,$07,$09,$08,$04,$08,$07,$08,$07,$08,$03,$09,$05,$07
+  .db $0a,$08,$07,$05,$08,$09,$09,$08,$0b,$07,$09,$05,$07,$07,$09,$08,$04,$08,$07,$08,$07,$08,$03,$09,$05,$07,$08
 _font_start:
 _char_upper_A:
   .db $00,$01,$00,$40,$28,$0a,$04,$41,$10,$4e,$3c,$88,$2a,$05,$01,$00,$00
@@ -363,7 +366,7 @@ _char_lower_r:
 ; db 01000
 ; db 01000
 _char_other_greaterthan:
-	.db $00,$00,$06,$03,$80,$80,$86,$71,$00,$00
+  .db $00,$00,$06,$03,$80,$80,$86,$71,$00,$00,$00,$00,$00,$00,$00,$00,$00
 ; db 0000000
 ; db 0000000
 ; db 0000000
@@ -375,6 +378,20 @@ _char_other_greaterthan:
 ; db 0111000
 ; db 1000000
 ; db 0000000
+_char_upper_E:
+  .db $00,$7c,$80,$80,$80,$80,$78,$40,$40,$42,$41,$3e,$00,$00,$00,$00,$00
+; db 00000000
+; db 01111100
+; db 10000000
+; db 10000000
+; db 10000000
+; db 10000000
+; db 01111000
+; db 01000000
+; db 01000000
+; db 01000010
+; db 01000001
+; db 00111110
 _font_numbers:
 numberCharsOffset  .equ (_font_numbers-_font_start)*8 ; offset from pixelShadow2 for uncompressed number chars
 _char_number_0:
@@ -518,16 +535,4 @@ _char_number_9:
 ; db 00100100
 ; db 00011000
 _font_end:
-_text_title_start:
-  db $0a,$07,$05,$00,$08,$0a,$10,$02,$04,$0b,$10,$03,$09,$10,$06,$01,$00,$0c,$0c,$00 ; "ATTACK of the SNAILS"
-_text_title_end:
-_text_title_width   .equ 170
-_text_play_start:
-  db $0f,$00,$07,$0e,$18 ; ">PLAY"
-_text_play_end:
-_text_play_width    .equ 46
-_text_credits_start:
-  db $11,$0d,$16,$17,$02,$09,$04,$0e,$16,$11,$10,$12,$14,$10,$15,$02,$0b,$13,$02,$18,$01 ; "Created by _iPhoenix_"
-_text_credits_end:
-_text_credits_width .equ 159
 .echo "Font loaded." ; prettifier-decrease-indent

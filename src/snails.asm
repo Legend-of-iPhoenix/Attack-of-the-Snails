@@ -4,44 +4,55 @@
 #define dw .dw ; convpng -> compiler compatibility
 #define db .db
 
-lineDistance .equ lcdWidth/10
-lineXStart   .equ lineDistance/2
+; text width information
+_text_title_width   .equ 170
+_text_play_width    .equ 46
+_text_exit_width    .equ 26
+_text_credits_width .equ 159
 
-lineYStart   .equ 100
-lineHeight   .equ lcdHeight - lineYStart
+lineDistance  .equ lcdWidth/10
+lineXStart    .equ lineDistance/2
+
+lineYStart    .equ 100
+lineHeight    .equ lcdHeight - lineYStart
 
 snailStart    .equ pixelShadow + 1
-snailData0    .equ pixelShadow + 1 ; these hold the binary values with the snail
+snailData0    .equ pixelShadow + 1 ; these hold the binary values with the snail positions
 snailData1    .equ pixelShadow + 2
 snailData2    .equ pixelShadow + 3
 snailData3    .equ pixelShadow + 4
 snailData4    .equ pixelShadow + 5
-snailData5    .equ pixelShadow + 6
-snailData6    .equ pixelShadow + 7
 
-nextSnail     .equ pixelShadow + 8
-numSnailRows  .equ 7 ; snailData0 to snailData6
+nextSnail     .equ pixelShadow + 6
+numSnailRows  .equ 5 ; snailData0 to snailData6
 
-playerPosOld .equ pixelShadow + 9
-playerPos    .equ pixelShadow + 10
+playerPosOld  .equ pixelShadow + 9
+playerPos     .equ pixelShadow + 10
 
 rng_seed_location .equ pixelShadow + 11
 
-timerMax     .equ pixelShadow + 12
-timer        .equ pixelShadow + 15
+timerMax      .equ pixelShadow + 12
+timer         .equ pixelShadow + 15
 
-score        .equ pixelShadow + 18 ; 24 bits
-multiplier   .equ pixelShadow + 21
-round        .equ pixelShadow + 22 ; 8 bits, loops every 8 rounds.
+score         .equ pixelShadow + 18 ; 24 bits
+multiplier    .equ pixelShadow + 21
+round         .equ pixelShadow + 22 ; 8 bits, loops every 8 rounds.
 
-health       .equ pixelShadow + 23
+health        .equ pixelShadow + 23
 
-tempStorage  .equ pixelShadow + 24 ; 24 bits, used in font routine
-hudSize      .equ lcdWidth * 32
+tempStorage   .equ pixelShadow + 24 ; 24 bits, used in font routine
+hudSize       .equ lcdWidth * 32
 
 healthBarOffset     .equ lcdWidth * 8 + 80
 healthSegmentWidth  .equ (2*(lcdWidth-80)/3)/8 ; 8 is health max
 healthSegmentHeight .equ 8
+
+menuTextLeft .equ (lcdWidth/2)-_text_play_width
+menuTextTop  .equ 64
+
+caratWidth   .equ $07 ; width of '>' char
+caratChar    .equ $19 ; '>'
+caratPos     .equ pixelShadow + 27
 
 snailHeight  .equ 15
 snailWidth   .equ 6
@@ -100,6 +111,8 @@ _:
   
   ld a, lcdBpp8
   ld (mpLcdCtrl), a
+  xor a, a
+  ld (caratPos), a
 main_menu:
   ld hl, vRAM
   ld de, vRAM+1
@@ -111,27 +124,94 @@ main_menu:
   ld bc, _text_title_end-_text_title_start
   call load_text
   ld hl, (lcdWidth-_text_title_width)/2
-  ld e, 0   
+  ld e, 0
   call draw_text
   
   ld hl, _text_play_start
   ld bc, _text_play_end-_text_play_start
   call load_text
-  ld hl, (lcdWidth/2)-_text_play_width
-  ld e, 64
+  ld hl, menuTextLeft
+  ld e, menuTextTop
+  call draw_text
+  
+  ld hl, _text_exit_start
+  ld bc, _text_exit_end-_text_exit_start
+  call load_text
+  ld hl, menuTextLeft + caratWidth ; align it with the "PLAY" sign.
+  ld e, menuTextTop+glyphHeight
   call draw_text
   
   ld hl, _text_credits_start
   ld bc, _text_credits_end-_text_credits_start
   call load_text
   ld hl, 0
-  ld e, lcdHeight-12
+  ld e, lcdHeight-glyphHeight
   call draw_text
   
 _menu_key_wait:
   call _GetCSC
   or a, a
   jr z, _menu_key_wait
+  cp a, skDown
+  jr nz, _
+  call _menu_swap_cursor
+  jr _menu_key_wait
+_:
+  cp a, skUp
+  jr nz, _
+  call _menu_swap_cursor
+  jr _menu_key_wait
+_:
+  cp a, skEnter
+  jr nz, _menu_key_wait
+  jr menu_end
+_menu_swap_cursor:
+; swaps the carat
+; destroys all
+  ld (caratPos), a
+  xor a, 1
+  and a, 1
+  ld l, a
+  ld h, glyphHeight
+  mlt hl
+  ld h, lcdWidth/2
+  mlt hl
+  add hl, hl
+  ld de, lcdWidth * menuTextTop + menuTextLeft + vRAM
+  add hl, de
+  push hl
+  pop de
+  inc de
+  ld b, glyphHeight
+_menu_erase_nextRow:
+  push bc
+    ld b, 0
+    ld (hl), white
+    ld c, caratWidth-1
+    ldir
+    ld bc, lcdWidth-caratWidth+1
+    add hl, bc
+    ex de, hl
+    add hl, bc
+    ex de, hl
+  pop bc
+  djnz _menu_erase_nextRow
+  ld (caratPos), a
+  xor a, 1
+  and a, 1
+  ld l, a
+  ld h, glyphHeight
+  mlt hl
+  ld a, l
+  add a, menuTextTop
+  ld e, a
+  ld a, caratChar
+  ld (OP1), a
+  ld a, b
+  ld b, 1
+  ld hl, menuTextLeft
+  call draw_text
+  ret
 menu_end:
 ; clear the hud area.
   ld hl, vRAM
@@ -154,8 +234,11 @@ _init_nextRow:
     inc hl ; move to next row
   pop bc
   djnz _init_nextRow
+; this is arbitrary, it's just the starting "difficulty"
+; if you decrease it, the game will be harder from the start
+; increasing it does the opposite (it'll be easier)
+  ld hl, $4000 
   
-  ld hl, $4000
   ld (timerMax), hl
   
   ld a, 8
@@ -725,6 +808,18 @@ snail_sprite:
   db 009h,003h,003h,009h,009h,009h
   db 003h,003h,009h,009h,009h,009h
   #include "font.asm"
+_text_title_start:
+  db $0a,$07,$05,$00,$08,$0a,$10,$02,$04,$0b,$10,$03,$09,$10,$06,$01,$00,$0c,$0c,$00 ; "ATTACK of the SNAILS"
+_text_title_end:
+_text_play_start:
+  db $0f,$00,$07,$0e,$19 ; ">PLAY"
+_text_play_end:
+_text_exit_start:
+  db $0b,$16,$0d,$1a ; "Exit"
+_text_exit_end:
+_text_credits_start:
+  db $11,$0d,$16,$17,$02,$09,$04,$0e,$16,$11,$10,$12,$14,$10,$15,$02,$0b,$13,$02,$18,$01 ; "Created by _iPhoenix_"
+_text_credits_end:
 prgm_end:
 .nolist ; prettifier-decrease-indent
 .echo "====="
