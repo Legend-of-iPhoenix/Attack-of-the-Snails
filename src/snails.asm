@@ -6,8 +6,8 @@
 
 ; text width information
 _text_title_width   .equ 170
-_text_play_width    .equ 46
-_text_exit_width    .equ 26
+_text_play_width    .equ 42
+_text_exit_width    .equ 31
 _text_credits_width .equ 159
 
 lineDistance  .equ lcdWidth/10
@@ -31,16 +31,16 @@ playerPos     .equ pixelShadow + 10
 
 rng_seed_location .equ pixelShadow + 11
 
-timerMax      .equ pixelShadow + 12
-timer         .equ pixelShadow + 15
+timerMax      .equ pixelShadow + 15
+timer         .equ pixelShadow + 18
 
 score         .equ pixelShadow + 18 ; 24 bits
 multiplier    .equ pixelShadow + 21
-round         .equ pixelShadow + 22 ; 8 bits, loops every 8 rounds.
+round         .equ pixelShadow + 24 ; 8 bits, loops every 8 rounds.
 
-health        .equ pixelShadow + 23
+health        .equ pixelShadow + 25
 
-tempStorage   .equ pixelShadow + 24 ; 24 bits, used in font routine
+tempStorage   .equ pixelShadow + 26 ; 24 bits, used in font routine
 hudSize       .equ lcdWidth * 32
 
 healthBarOffset     .equ lcdWidth * 8 + 80
@@ -52,7 +52,7 @@ menuTextTop  .equ 64
 
 caratWidth   .equ $07 ; width of '>' char
 caratChar    .equ $19 ; '>'
-caratPos     .equ pixelShadow + 27
+caratPos     .equ pixelShadow + 30
 
 snailHeight  .equ 15
 snailWidth   .equ 6
@@ -113,6 +113,7 @@ _:
   ld (mpLcdCtrl), a
   xor a, a
   ld (caratPos), a
+  
 main_menu:
   ld hl, vRAM
   ld de, vRAM+1
@@ -170,7 +171,7 @@ _menu_swap_cursor:
 ; destroys all
   ld (caratPos), a
   xor a, 1
-  and a, 1
+  and a, 1 ; not sure why I have to do this, but it works if I do and doesn't work if I don't.
   ld l, a
   ld h, glyphHeight
   mlt hl
@@ -213,6 +214,9 @@ _menu_erase_nextRow:
   call draw_text
   ret
 menu_end:
+  ld a, (caratPos) ; to-do: fix this
+  dec a
+  jp c, quit
 ; clear the hud area.
   ld hl, vRAM
   ld de, vRAM + 1
@@ -246,6 +250,7 @@ _init_nextRow:
   
   ld a, 1
   ld (round), a
+  ld (multiplier), a
   
 ; draw health bar
   ld c, healthSegmentWidth
@@ -283,11 +288,13 @@ time_up:
   call drawSnailies
   ld hl, (timerMax)
   ld (timer), hl
+  ld hl, round
   ld de, 1
-  ld a, (round)
+  ld a, (hl)
   rlca
-  ld (round), a
+  ld (hl), a
   jr nc, mainLoop
+  ld hl, (timerMax)
 ; if it got to here, the round counter looped and we should increase the difficulty.
   ld de, $f0
   sbc hl, de
@@ -325,7 +332,7 @@ _getKeyCode:
   ld b, a
   rrca
   ld (playerPos), a
-  call redrawPlayer
+  call redrawPlayer 
   jr movePlayer
 _chkRight:
   djnz _chkQuit
@@ -807,15 +814,15 @@ snail_sprite:
   db 009h,003h,003h,000h,009h,009h
   db 009h,003h,003h,009h,009h,009h
   db 003h,003h,009h,009h,009h,009h
-  #include "font.asm"
+#include "font.asm"
 _text_title_start:
   db $0a,$07,$05,$00,$08,$0a,$10,$02,$04,$0b,$10,$03,$09,$10,$06,$01,$00,$0c,$0c,$00 ; "ATTACK of the SNAILS"
 _text_title_end:
 _text_play_start:
-  db $0f,$00,$07,$0e,$19 ; ">PLAY"
+  db $12,$13,$1b,$0e,$10,$19 ; "> Play"
 _text_play_end:
 _text_exit_start:
-  db $0b,$16,$0d,$1a ; "Exit"
+  db $0b,$16,$0d,$1a,$10 ; " Exit"
 _text_exit_end:
 _text_credits_start:
   db $11,$0d,$16,$17,$02,$09,$04,$0e,$16,$11,$10,$12,$14,$10,$15,$02,$0b,$13,$02,$18,$01 ; "Created by _iPhoenix_"

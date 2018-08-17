@@ -1,6 +1,6 @@
 .echo "Loading font..." ; prettifier-increase-indent
 ; chars:
-; "ACefhIKLNoStTxPY _yabdinr>"
+; "ACefhIKLNoStTxPY _yabdinr>ElcgHmsuD"
 ; numbers:
 ; "0123456789"
 ; to get known chars:
@@ -9,11 +9,11 @@
 ; .match(/; db [01]+/g).filter((a,b)=>!(b%12)).map(x=>'$'+x.match(/[01]+/g)[0].length.toString(16).padStart(2,0)).join(',')
 ; to convert binary data to hex for .db
 ; .match(/[01]+/g).join('').match(/[01]{1,8}/g).map(x=>'$'+parseInt(x,2).toString(16).padStart(2,0)).join(',')
-; convpng -> binary: (only the part with the db's)
-; .replace(/000h,?/g,1).replace(/00Bh,?/g,0).split("\n").map(r=>r.substring(4).split("")),r=(r=>{for(i in b=[],r[0]){b.push(r.map(r=>r[i]).reverse())}return b}),b=r(a).map(r=>r.join("")),v=(r=>(f=!0,r.map((e,p)=>(f=r[p]=="0".repeat(12)&f)?"":e).reverse())),b=r(v(v(b)).map(r=>r.split("")).filter(r=>r.length)).map(r=>'; db '+r.join("")).join("\n");
+; convpng -> binary: (the script to end all scripts, GG)
+; (e=>(r=(e=>{for(i in b=[],e[0])b.push(e.map(e=>e[i]).reverse());return b}),e.replace(/; .*/g,"").replace(/\n\s+\.db .*/g,"").replace(/[^\.\n]*\.equ .*/g,"").replace(/\n\n/g,"").replace(/000h,?/g,1).replace(/00Bh,?/g,0).match(/:\n((?:\s+db [01]+\n){12})/g).map(e=>e.substring(2)).map(e=>e.split("\n").filter(e=>e.startsWith(" db")).map(e=>e.substring(4).split(""))).map(e=>(b=r(e).map(e=>e.join("")),v=(e=>(f=!0,e.map((r,a)=>(f=e[a]=="0".repeat(12)&f)?"":r).reverse())),c=r(v(v(b)).map(e=>e.split("")).filter(e=>e.length)).map(e=>"; db "+e.reverse().join("")).reverse().join("\n")," .db "+c.match(/[01]+/g).join("").match(/[01]{1,8}/g).map(e=>"$"+parseInt(e,2).toString(16).padStart(2,0)).join(",").padEnd(67,",$00")+"\n"+c)).join("\n\n")))(str)
 ; the above are JS tools I wrote to assist in conversion from convpng output to my 1bpp format.
 _char_widths:
-  .db $0a,$08,$07,$05,$08,$09,$09,$08,$0b,$07,$09,$05,$07,$07,$09,$08,$04,$08,$07,$08,$07,$08,$03,$09,$05,$07,$08
+  .db $0a,$08,$07,$05,$08,$09,$09,$08,$0b,$07,$09,$05,$07,$07,$09,$08,$04,$08,$07,$08,$07,$08,$03,$09,$05,$07,$08,$02,$06,$06,$09,$0b,$06,$08,$09
 _font_start:
 _char_upper_A:
   .db $00,$01,$00,$40,$28,$0a,$04,$41,$10,$4e,$3c,$88,$2a,$05,$01,$00,$00
@@ -392,6 +392,118 @@ _char_upper_E:
 ; db 01000010
 ; db 01000001
 ; db 00111110
+_char_lower_l:
+ .db $15,$56,$aa,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+; db 00
+; db 01
+; db 01
+; db 01
+; db 01
+; db 01
+; db 01
+; db 10
+; db 10
+; db 10
+; db 10
+; db 10
+_char_lower_c:
+ .db $00,$00,$00,$39,$14,$20,$82,$14,$9c,$00,$00,$00,$00,$00,$00,$00,$00
+; db 000000
+; db 000000
+; db 000000
+; db 000000
+; db 001110
+; db 010001
+; db 010000
+; db 100000
+; db 100000
+; db 100001
+; db 010010
+; db 011100
+_char_lower_g:
+ .db $00,$00,$18,$9a,$14,$4f,$04,$18,$9c,$00,$00,$00,$00,$00,$00,$00,$00
+; db 000000
+; db 000000
+; db 000000
+; db 011000
+; db 100110
+; db 100001
+; db 010001
+; db 001111
+; db 000001
+; db 000001
+; db 100010
+; db 011100
+_char_upper_H:
+ .db $21,$10,$88,$44,$24,$13,$f1,$08,$84,$42,$21,$20,$b0,$02,$00,$00,$00
+; db 001000010
+; db 001000010
+; db 001000010
+; db 001000010
+; db 010000010
+; db 011111100
+; db 010000100
+; db 010000100
+; db 010000100
+; db 010000100
+; db 100000101
+; db 100000010
+_char_lower_m:
+ .db $00,$00,$00,$00,$00,$03,$08,$96,$91,$12,$21,$84,$30,$86,$11,$42,$02
+; db 00000000000
+; db 00000000000
+; db 00000000000
+; db 00000000000
+; db 00110000100
+; db 01001011010
+; db 01000100010
+; db 01000100001
+; db 10000100001
+; db 10000100001
+; db 10000100010
+; db 10000100010
+_char_lower_s:
+ .db $00,$00,$18,$9a,$18,$18,$18,$18,$9c,$00,$00,$00,$00,$00,$00,$00,$00
+; db 000000
+; db 000000
+; db 000000
+; db 011000
+; db 100110
+; db 100001
+; db 100000
+; db 011000
+; db 000110
+; db 000001
+; db 100010
+; db 011100
+_char_lower_u:
+ .db $00,$00,$00,$00,$84,$84,$84,$84,$84,$44,$4d,$32,$00,$00,$00,$00,$00
+; db 00000000
+; db 00000000
+; db 00000000
+; db 00000000
+; db 10000100
+; db 10000100
+; db 10000100
+; db 10000100
+; db 10000100
+; db 01000100
+; db 01001101
+; db 00110010
+_char_upper_D:
+ .db $00,$3e,$10,$88,$24,$12,$05,$02,$81,$80,$c0,$a1,$8f,$00,$00,$00,$00
+; db 000000000
+; db 011111000
+; db 010000100
+; db 010000010
+; db 010000010
+; db 010000001
+; db 010000001
+; db 010000001
+; db 100000001
+; db 100000010
+; db 100001100
+; db 011110000
 _font_numbers:
 numberCharsOffset  .equ (_font_numbers-_font_start)*8 ; offset from pixelShadow2 for uncompressed number chars
 _char_number_0:
