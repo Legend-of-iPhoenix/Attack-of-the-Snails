@@ -7,14 +7,8 @@
 ; text width information
 _text_title_width   .equ 170
 _text_play_width    .equ 42
-_text_exit_width    .equ 31
+_text_exit_width  .equ 31
 _text_credits_width .equ 159
-
-lineDistance  .equ lcdWidth/10
-lineXStart    .equ lineDistance/2
-
-lineYStart    .equ 100
-lineHeight    .equ lcdHeight - lineYStart
 
 snailStart    .equ pixelShadow + 1
 snailData0    .equ pixelShadow + 1 ; these hold the binary values with the snail positions
@@ -32,15 +26,16 @@ playerPos     .equ pixelShadow + 10
 rng_seed_location .equ pixelShadow + 11
 
 timerMax      .equ pixelShadow + 15
-timer         .equ pixelShadow + 18
+timer         .equ pixelShadow + 16
+timer2        .equ pixelShadow + 17
 
 score         .equ pixelShadow + 18 ; 24 bits
 multiplier    .equ pixelShadow + 21
-round         .equ pixelShadow + 24 ; 8 bits, loops every 8 rounds.
+round         .equ pixelShadow + 22 ; 8 bits, loops every 8 rounds.
 
-health        .equ pixelShadow + 25
+health        .equ pixelShadow + 23
 
-tempStorage   .equ pixelShadow + 26 ; 24 bits, used in font routine
+tempStorage   .equ pixelShadow + 24 ; 24 bits, used in font routine
 hudSize       .equ lcdWidth * 32
 
 healthBarOffset     .equ lcdWidth * 8 + 80
@@ -52,11 +47,12 @@ menuTextTop  .equ 64
 
 caratWidth   .equ $07 ; width of '>' char
 caratChar    .equ $19 ; '>'
-caratPos     .equ pixelShadow + 30
+caratPos     .equ pixelShadow + 27
 
 snailHeight  .equ 15
 snailWidth   .equ 6
 snailXOffset .equ 4
+snailSpacing .equ 5
 
 glyphHeight  .equ 12
 glyphSpacing .equ 1
@@ -71,6 +67,12 @@ playerHeight .equ 37 - 1 ; yeah it's a weird number, but it's what I ended up wi
 playerWidth  .equ 16 - 2
 
 spriteCenteringConstant .equ 8
+
+lineDistance  .equ lcdWidth/10
+lineXStart    .equ lineDistance/2
+
+lineHeight    .equ (snailHeight + snailSpacing) * numSnailRows
+lineYStart    .equ lcdHeight - lineHeight - 16 ; 16 pixels of padding on the bottom
 .list
   
   .org UserMem-2
@@ -146,6 +148,7 @@ main_menu:
   ld bc, _text_credits_end-_text_credits_start
   call load_text
   ld hl, 0
+  ld (score), hl ; hl is set to zero, why not use it to initialize the score and save some bytes.
   ld e, lcdHeight-glyphHeight
   call draw_text
   
@@ -169,9 +172,7 @@ _:
 _menu_swap_cursor:
 ; swaps the carat
 ; destroys all
-  ld (caratPos), a
-  xor a, 1
-  and a, 1 ; not sure why I have to do this, but it works if I do and doesn't work if I don't.
+  ld a, (caratPos)
   ld l, a
   ld h, glyphHeight
   mlt hl
@@ -197,9 +198,9 @@ _menu_erase_nextRow:
     ex de, hl
   pop bc
   djnz _menu_erase_nextRow
-  ld (caratPos), a
+  ld a, (caratPos)
   xor a, 1
-  and a, 1
+  ld (caratPos), a
   ld l, a
   ld h, glyphHeight
   mlt hl
@@ -214,9 +215,9 @@ _menu_erase_nextRow:
   call draw_text
   ret
 menu_end:
-  ld a, (caratPos) ; to-do: fix this
-  dec a
-  jp c, quit
+  ld a, (caratPos)
+  xor a, 1
+  jp z, quit
 ; clear the hud area.
   ld hl, vRAM
   ld de, vRAM + 1
@@ -241,9 +242,9 @@ _init_nextRow:
 ; this is arbitrary, it's just the starting "difficulty"
 ; if you decrease it, the game will be harder from the start
 ; increasing it does the opposite (it'll be easier)
-  ld hl, $4000 
+  ld a, 120
   
-  ld (timerMax), hl
+  ld (timerMax), a
   
   ld a, 8
   ld (health), a
@@ -251,11 +252,11 @@ _init_nextRow:
   ld a, 1
   ld (round), a
   ld (multiplier), a
+  call drawMultiplier
   
 ; draw health bar
   ld c, healthSegmentWidth
-  ld a, (health)
-  ld b, a
+  ld b, 8
   mlt bc ; health * width per health
   ld a, healthSegmentHeight
   ld hl, vRAM + healthBarOffset
@@ -286,44 +287,60 @@ _init_nextHealthBarLine:
 time_up:
   call moveSnailies
   call drawSnailies
-  ld hl, (timerMax)
-  ld (timer), hl
+  ld a, 20
+  ld (timer2), a
+  ld a, (timerMax)
+  ld (timer), a
   ld hl, round
   ld de, 1
   ld a, (hl)
   rlca
   ld (hl), a
   jr nc, mainLoop
-  ld hl, (timerMax)
+  ld hl, timerMax
 ; if it got to here, the round counter looped and we should increase the difficulty.
-  ld de, $f0
-  sbc hl, de
-  ld (timerMax), hl
+  dec (hl)
   ld hl, multiplier
   inc (hl)
-  ld de, vRAM
-  ld e, (hl)
-  ld a, black
-  ld (de), a
+  call drawMultiplier
 mainLoop:
   jp movePlayer
 quit:
   ld a, lcdBpp16 ; 16 bits per pixel
   ld (mpLcdCtrl), a
+; clear screen
+  ld hl, vRAM
+  ld de, vRAM + 1
+  ld bc, lcdWidth * lcdHeight
+  ld (hl), $ff ; white
+  ldir
+; draw status bar
   call  _DrawStatusBar
   ret
 movePlayer:
-  ld hl, (timer)
-  ld de, 1
+  ld a, (timer)
+  ld l, a
+  ld a, (timer2)
+  ld h, a
 _getKeyCode:
   push hl
     call _GetCSC
   pop hl
-  or a, a
-  sbc hl, de ; de=1, basically a "dec hl", but it updates flags.
-  jr z, time_up
-  ld (timer), hl
-  or a, a ; set to zero if a is zero
+  push af
+    dec l
+    jr nz, _
+    dec h
+    jr z, time_up
+    call shiftSnails
+    ld a, (timerMax)
+    ld l, a
+_:
+    ld a, l
+    ld (timer), a
+    ld a, h
+    ld (timer2), a
+  pop af
+  or a, a ; update z flag
   jr z, _getKeyCode
   dec a
   ld b, a
@@ -332,7 +349,7 @@ _getKeyCode:
   ld b, a
   rrca
   ld (playerPos), a
-  call redrawPlayer 
+  call redrawPlayer
   jr movePlayer
 _chkRight:
   djnz _chkQuit
@@ -344,9 +361,13 @@ _chkRight:
 _chkQuit:
   djnz _getKeyCode
   jp quit
+erasePlayer:
+  ld b, a
+  xor a, a ; set zero flag
 redrawPlayer:
 ; input of current player position in a
 ; previous position in b
+; for erase only, set zero flag
   push af
     ld a, b
     call playerPosConvert
@@ -361,6 +382,7 @@ playerEraseInner:
     dec a
     jr nz, playerEraseOuter
   pop af
+  ret z
 drawPlayer:
   call playerPosConvert
   ld de, player_standing_sprite
@@ -387,7 +409,7 @@ playerPosConvert:
 _a_log_2:
 ; gets a log_2, assuming a is of the form 2^n
 ; output in e, because it's used as part of a subroutine.
-; corrupts de
+; corrupts de (ofc)
   push af
     ld e,$00
     inc e
@@ -397,7 +419,7 @@ _a_log_2:
 ; </a_log_2>
   ld d, lineDistance
   mlt de
-  ld hl, (lineYStart - playerHeight - 4) * lcdWidth + vRAM + lineXStart - spriteCenteringConstant
+  ld hl, (lineYStart - playerHeight - 4 - snailHeight) * lcdWidth + vRAM + lineXStart - spriteCenteringConstant
   add hl, de
   ld a, playerHeight
   ret
@@ -492,6 +514,8 @@ moveSnailies:
   jp z, quit
 ; push it back on if we didn't run out of health so we can ret later.
   push hl ; prettifier-no-indent-change
+; draw multiplier change
+  call drawMultiplier
 ; draw health bar change
   ld c, healthSegmentWidth
   ld a, (health)
@@ -522,7 +546,7 @@ doScoring:
   ld c, 0 ; this will be the change in score
 _scoreSnail:
   ld a, (playerPos)
-  and (hl) ; hl is the row of snail
+  and a, (hl) ; hl is the row of snails
   inc hl ; this doesn't alter flags
   jr z, _moreSnail
   inc c
@@ -538,7 +562,7 @@ _moreSnail:
     push de
       push hl
       pop bc
-      ld a, 0
+      xor a, a
       ld de, 0
       call drawScore
     pop de
@@ -592,7 +616,7 @@ load_text:
   ld b, c
   ret
 draw_text:
-; draws text to the screen using the custom font.
+; draws text to the screen
 ; text in OP1, length in b
 ; text should be reversed! (i.e. "ABC" in OP1 draws as "CBA" on-screen)
 ; position is (hl, e), zero-indexed to the top left of the screen
@@ -744,8 +768,41 @@ _OP1plusB:
     add hl, bc
   pop bc
   ret
-  
-  
+drawMultiplier:
+  ld a, $0d ; "x"
+  ld (OP1), a
+  ld b, 1
+  ld hl, 0
+  ld e, glyphHeight
+  call draw_text
+  ld de, 7 ; width of "x"
+  ld bc, 0
+  ld a, (multiplier)
+  ld c, a
+  ld a, glyphHeight
+  call drawScore
+  ret
+shiftSnails:
+; shifts the snails up a row.
+; preserves all
+  breakpoint("shiftSnails")
+  push af
+    push bc
+      push de
+        push hl
+          ld a, (playerPos)
+          call erasePlayer ; erase player
+          ld hl, (lineYStart - 15) * lcdWidth + vRAM
+          ld de, (lineYStart - 16) * lcdWidth + vRAM
+          ld bc, (lineHeight + 15) * lcdWidth
+          ldir
+          ld a, (playerPos)
+          call drawPlayer
+        pop hl
+      pop de
+    pop bc
+  pop af
+  ret
 code_end:
 ; code ends here, sprite stuff starts here. All of this was converted with ConvPNG
 palette:
@@ -814,7 +871,7 @@ snail_sprite:
   db 009h,003h,003h,000h,009h,009h
   db 009h,003h,003h,009h,009h,009h
   db 003h,003h,009h,009h,009h,009h
-#include "font.asm"
+  #include "font.asm"
 _text_title_start:
   db $0a,$07,$05,$00,$08,$0a,$10,$02,$04,$0b,$10,$03,$09,$10,$06,$01,$00,$0c,$0c,$00 ; "ATTACK of the SNAILS"
 _text_title_end:
