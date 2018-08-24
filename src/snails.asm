@@ -89,9 +89,9 @@ lineXStart    .equ lineDistance/2
 lineHeight    .equ (snailHeight + snailSpacing) * numSnailRows
 lineYStart    .equ lcdHeight - lineHeight - 16 ; 16 pixels of padding on the bottom
 
-; animation timings - each tick is effectively 12 clock cycles
-snailAttackFrame .equ 100 ; 0-255 "ticks" (not CC's). Time between redraws of the animation
-snailAttackPause .equ 80 ; 0-255 "ticks". Time before snail attack animation plays
+; animation timings - each tick is effectively 86 clock cycles, or about 1.8ms
+snailAttackFrame .equ 255 ; 0-255 "ticks" (not CC's). Time between redraws of the animation
+snailAttackPause .equ 255 ; 0-255 "ticks". Time before snail attack animation plays
 
 ; this is arbitrary, it's just the starting "difficulty"
 ; if you decrease it, the game will be harder from the start
@@ -171,7 +171,8 @@ main_menu:
   ld hl, _text_credits_start
   ld bc, _text_credits_end-_text_credits_start
   call load_text
-  ld hl, 0
+  or a, a
+  sbc hl, hl
   ld (score), hl ; hl is set to zero, why not use it to initialize the score and save some bytes.
   ld e, lcdHeight-glyphHeight
   call draw_text
@@ -274,6 +275,7 @@ _init_nextRow:
   ld (round), a
   ld (multiplier), a
   ld (evenMoreTimer), a
+  ld (playerPos), a
   call drawMultiplier
   
 ; draw health bar
@@ -282,7 +284,9 @@ _init_nextRow:
   mlt bc ; health * width per health
   ld a, healthSegmentHeight
   ld hl, vRAM + healthBarOffset
-  ld de, vRAM + healthBarOffset + 1
+  push hl
+  pop de
+  inc de
 _init_nextHealthBarLine:
   ld (hl), green
   push bc
@@ -303,9 +307,6 @@ _init_nextHealthBarLine:
   pop bc
   dec a 
   jr nz, _init_nextHealthBarLine
-  .echo convhex(timerMax)
-  ld a, $1
-  ld (playerPos), a
   push af ; prettifier-no-indent-change (bit of a hack)
 time_up:
   pop af ; prettifier-no-indent-change
@@ -349,16 +350,26 @@ movePlayer:
 _getKeyCode:
   push hl
     call _GetCSC
+    breakpoint("getcsc")
     ld hl, evenMoreTimer
     rlc (hl)
   pop hl
   jr nc, _gck_skip
+  breakpoint("dec")
   push af
     dec l
     jr nz, _
     dec h
+    breakpoint("dec2")
     jr z, time_up
-    call shiftSnails
+; shift the snails up a row.
+    breakpoint("shift")
+    push hl
+      ld hl, (lineYStart - 20) * lcdWidth + vRAM ; 20 comes from snail height + snail spacing
+      ld de, (lineYStart - 21) * lcdWidth + vRAM
+      ld bc, (lineHeight + 20) * lcdWidth
+      ldir
+    pop hl
     ld a, h
     ld (moreTimer), a
     ld a, (timerMax)
@@ -372,19 +383,23 @@ _gck_skip:
   jr z, _getKeyCode
   dec a
   ld b, a
-  ld a, (playerPos)
+  push hl ; prettifier-no-indent-change
+  ld hl, playerPos
   djnz _chkRight
-  ld b, a
-  rrca
+  ld b, (hl)
+  rrc (hl)
+  pop hl ; prettifier-no-indent-change
   call redrawPlayer
   jr movePlayer
 _chkRight:
   djnz _chkQuit
-  ld b, a
-  rlca
+  ld b, (hl)
+  rlc (hl)
+  pop hl ; prettifier-no-indent-change
   call redrawPlayer
   jr movePlayer
 _chkQuit:
+  pop hl ; prettifier-no-indent-change
   djnz _getKeyCode
   jp quit
 erasePlayer:
@@ -601,12 +616,10 @@ _moreSnail:
   ld bc, numSnailRows
   ldir
 ; animations:
-  ld b, snailAttackPause
-_attackPause:
-  nop
-  djnz _attackPause
+  call wait
   ld b, 10
 _attackAnimation:
+; leap forward
   push bc
     call erasePlayer
     ld hl, (lineYStart - 30) * lcdWidth + vRAM ; 30 comes from snail height + snail spacing + the 10 spaces we are shifting them up
@@ -614,27 +627,50 @@ _attackAnimation:
     ld bc, (snailHeight + snailSpacing + 11) * lcdWidth
     ldir
     call drawPlayer
-    ld b, snailAttackFrame
-_:
-    nop
-    djnz -_
+    call wait
   pop bc
   djnz _attackAnimation
+  call wait
   ld b, 10
 _attackAnimation_2:
+; leap back
   push bc
     call erasePlayer
     ld hl, (lineYStart - 1) * lcdWidth + vRAM ; 30 comes from snail height + snail spacing + the 10 spaces we are shifting them up
-    ld de, (lineYStart) * lcdWidth + vRAM
+    ld de, lineYStart * lcdWidth + vRAM
     ld bc, (snailHeight + snailSpacing + 10) * lcdWidth
+    breakpoint("attk2")
     lddr
     call drawPlayer
-    ld b, snailAttackFrame
-_:
-    nop
-    djnz -_
+    call wait
   pop bc
   djnz _attackAnimation_2
+  ld b, (lineDistance * 8 + lineXStart)/2
+_attackAnimation_3:
+  breakpoint("attackAnimation3")
+; go out to the left
+  push bc
+    ld b, snailHeight
+_shiftLeftNextRow:
+    push bc
+      ld c, lcdWidth/2
+      mlt bc
+      ld hl, (lineYStart - snailHeight - snailSpacing) * lcdWidth + vRAM + 2
+      or a, a
+      adc hl, bc
+      adc hl, bc
+      push hl
+      pop de
+      dec de
+      dec de ; de = hl - 2
+      ld bc, lineDistance * 8 + lineXStart + 3 ; +3 is to make sure it erases properly
+      ldir
+    pop bc
+    djnz _shiftLeftNextRow
+    ld b, 128
+    call customWait
+  pop bc
+  djnz _attackAnimation_3
 attackAnimationEnd:
   xor a, a
   ret
@@ -844,19 +880,21 @@ drawMultiplier:
   ld a, glyphHeight
   call drawScore
   ret
-shiftSnails:
-; shifts the snails up a row.
-; preserves all
-  push bc
-    push de
-      push hl
-        ld hl, (lineYStart - 20) * lcdWidth + vRAM ; 20 comes from snail height + snail spacing
-        ld de, (lineYStart - 21) * lcdWidth + vRAM
-        ld bc, (lineHeight + 20) * lcdWidth
-        ldir
-      pop hl
-    pop de
-  pop bc
+wait:
+; wait routine
+; waits for about 1 ms (gg)
+  ld b, 255
+customWait:
+_:
+  ex (sp), hl
+  ex (sp), hl
+  ex (sp), hl
+  ex (sp), hl
+  ex (sp), hl
+  ex (sp), hl
+  ex (sp), hl
+  ex (sp), hl ; ex (sp), hl is the same length (in bytes) as nop, but it takes longer :)
+  djnz -_
   ret
 code_end:
 ; code ends here, sprite stuff starts here. All of this was converted with ConvPNG
