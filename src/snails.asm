@@ -10,50 +10,65 @@ _text_play_width    .equ 42
 _text_exit_width  .equ 31
 _text_credits_width .equ 159
 
+; snail positions
 snailStart    .equ pixelShadow + 1
-snailData0    .equ pixelShadow + 1 ; these hold the binary values with the snail positions
+snailData0    .equ pixelShadow + 1
 snailData1    .equ pixelShadow + 2
 snailData2    .equ pixelShadow + 3
 snailData3    .equ pixelShadow + 4
 snailData4    .equ pixelShadow + 5
 
+; other snail position equates
 nextSnail     .equ pixelShadow + 6
 numSnailRows  .equ 5 ; snailData0 to snailData6
 
+; player positioning locations
 playerPosOld  .equ pixelShadow + 9
 playerPos     .equ pixelShadow + 10
 
+; rng seed location
 rng_seed_location .equ pixelShadow + 11
 
+; timer locations
 timerMax      .equ pixelShadow + 15
 timer         .equ pixelShadow + 16
-timer2        .equ pixelShadow + 17
+moreTimer     .equ pixelShadow + 17
+evenMoreTimer .equ pixelShadow + 18
 
-score         .equ pixelShadow + 18 ; 24 bits
-multiplier    .equ pixelShadow + 21
-round         .equ pixelShadow + 22 ; 8 bits, loops every 8 rounds.
+; scoring locations
+score         .equ pixelShadow + 19 ; 24 bits
+multiplier    .equ pixelShadow + 22
+round         .equ pixelShadow + 23 ; 8 bits, loops every 8 rounds.
 
-health        .equ pixelShadow + 23
+health        .equ pixelShadow + 24
 
-tempStorage   .equ pixelShadow + 24 ; 24 bits, used in font routine
+; other
+tempStorage   .equ pixelShadow + 25 ; 24 bits, used in font routine
+
+; hud equates
 hudSize       .equ lcdWidth * 32
 
+; health bar equates
 healthBarOffset     .equ lcdWidth * 8 + 80
 healthSegmentWidth  .equ (2*(lcdWidth-80)/3)/8 ; 8 is health max
 healthSegmentHeight .equ 8
 
+; menu text equates
 menuTextLeft .equ (lcdWidth/2)-_text_play_width
 menuTextTop  .equ 64
 
+; carat equates
 caratWidth   .equ $07 ; width of '>' char
 caratChar    .equ $19 ; '>'
-caratPos     .equ pixelShadow + 27
+caratPos     .equ pixelShadow + 28
 
+; snail equates
 snailHeight  .equ 15
 snailWidth   .equ 6
 snailXOffset .equ 4
 snailSpacing .equ 5
 
+; font sizing equates
 glyphHeight  .equ 12
 glyphSpacing .equ 1
 
@@ -62,17 +77,26 @@ black        .equ $00
 white        .equ $09
 green        .equ $0a
 
-; If I'm subtracting, it means I shaved off a row/column
+; player size equates
 playerHeight .equ 37 - 1 ; yeah it's a weird number, but it's what I ended up with.
 playerWidth  .equ 16 - 2
-
 spriteCenteringConstant .equ 8
 
+; snail column equates
 lineDistance  .equ lcdWidth/10
 lineXStart    .equ lineDistance/2
 
 lineHeight    .equ (snailHeight + snailSpacing) * numSnailRows
 lineYStart    .equ lcdHeight - lineHeight - 16 ; 16 pixels of padding on the bottom
+
+; animation timings - each tick is effectively 12 clock cycles
+snailAttackFrame .equ 100 ; 0-255 "ticks" (not CC's). Time between redraws of the animation
+snailAttackPause .equ 80 ; 0-255 "ticks". Time before snail attack animation plays
+
+; this is arbitrary, it's just the starting "difficulty"
+; if you decrease it, the game will be harder from the start
+; increasing it does the opposite (it'll be easier)
+startingDifficulty  .equ 255
 .list
   
   .org UserMem-2
@@ -239,11 +263,8 @@ _init_nextRow:
     inc hl ; move to next row
   pop bc
   djnz _init_nextRow
-; this is arbitrary, it's just the starting "difficulty"
-; if you decrease it, the game will be harder from the start
-; increasing it does the opposite (it'll be easier)
-  ld a, 120
   
+  ld a, startingDifficulty
   ld (timerMax), a
   
   ld a, 8
@@ -252,6 +273,7 @@ _init_nextRow:
   ld a, 1
   ld (round), a
   ld (multiplier), a
+  ld (evenMoreTimer), a
   call drawMultiplier
   
 ; draw health bar
@@ -281,14 +303,16 @@ _init_nextHealthBarLine:
   pop bc
   dec a 
   jr nz, _init_nextHealthBarLine
-  
+  .echo convhex(timerMax)
   ld a, $1
   ld (playerPos), a
+  push af ; prettifier-no-indent-change (bit of a hack)
 time_up:
+  pop af ; prettifier-no-indent-change
   call moveSnailies
   call drawSnailies
   ld a, 20
-  ld (timer2), a
+  ld (moreTimer), a
   ld a, (timerMax)
   ld (timer), a
   ld hl, round
@@ -315,31 +339,35 @@ quit:
   ld (hl), $ff ; white
   ldir
 ; draw status bar
-  call  _DrawStatusBar
+  call _DrawStatusBar
   ret
 movePlayer:
   ld a, (timer)
   ld l, a
-  ld a, (timer2)
+  ld a, (moreTimer)
   ld h, a
 _getKeyCode:
   push hl
     call _GetCSC
+    ld hl, evenMoreTimer
+    rlc (hl)
   pop hl
+  jr nc, _gck_skip
   push af
     dec l
     jr nz, _
     dec h
     jr z, time_up
     call shiftSnails
+    ld a, h
+    ld (moreTimer), a
     ld a, (timerMax)
     ld l, a
 _:
     ld a, l
     ld (timer), a
-    ld a, h
-    ld (timer2), a
   pop af
+_gck_skip:
   or a, a ; update z flag
   jr z, _getKeyCode
   dec a
@@ -348,27 +376,25 @@ _:
   djnz _chkRight
   ld b, a
   rrca
-  ld (playerPos), a
   call redrawPlayer
   jr movePlayer
 _chkRight:
   djnz _chkQuit
   ld b, a
   rlca
-  ld (playerPos), a
   call redrawPlayer
   jr movePlayer
 _chkQuit:
   djnz _getKeyCode
   jp quit
 erasePlayer:
+  ld a, (playerPos)
   ld b, a
   xor a, a ; set zero flag
 redrawPlayer:
-; input of current player position in a
 ; previous position in b
 ; for erase only, set zero flag
-  push af
+  push af ; preserve flags
     ld a, b
     call playerPosConvert
     ld de, lcdWidth - playerWidth
@@ -384,6 +410,7 @@ playerEraseInner:
   pop af
   ret z
 drawPlayer:
+  ld a, (playerPos)
   call playerPosConvert
   ld de, player_standing_sprite
   ex de, hl
@@ -419,7 +446,7 @@ _a_log_2:
 ; </a_log_2>
   ld d, lineDistance
   mlt de
-  ld hl, (lineYStart - playerHeight - 4 - snailHeight) * lcdWidth + vRAM + lineXStart - spriteCenteringConstant
+  ld hl, (lineYStart - playerHeight - snailSpacing - snailHeight - 4) * lcdWidth + vRAM + lineXStart - spriteCenteringConstant ; 4 is padding
   add hl, de
   ld a, playerHeight
   ret
@@ -434,7 +461,6 @@ drawSnailies:
   ld (hl), white
   ldir
 ; draw player
-  ld a, (playerPos)
   call drawPlayer
   ld bc, numSnailRows ; set c to numSnailRows, clear upper byte. 
 _nextRow:
@@ -574,6 +600,42 @@ _moreSnail:
   ld de, snailData0
   ld bc, numSnailRows
   ldir
+; animations:
+  ld b, snailAttackPause
+_attackPause:
+  nop
+  djnz _attackPause
+  ld b, 10
+_attackAnimation:
+  push bc
+    call erasePlayer
+    ld hl, (lineYStart - 30) * lcdWidth + vRAM ; 30 comes from snail height + snail spacing + the 10 spaces we are shifting them up
+    ld de, (lineYStart - 31) * lcdWidth + vRAM
+    ld bc, (snailHeight + snailSpacing + 11) * lcdWidth
+    ldir
+    call drawPlayer
+    ld b, snailAttackFrame
+_:
+    nop
+    djnz -_
+  pop bc
+  djnz _attackAnimation
+  ld b, 10
+_attackAnimation_2:
+  push bc
+    call erasePlayer
+    ld hl, (lineYStart - 1) * lcdWidth + vRAM ; 30 comes from snail height + snail spacing + the 10 spaces we are shifting them up
+    ld de, (lineYStart) * lcdWidth + vRAM
+    ld bc, (snailHeight + snailSpacing + 10) * lcdWidth
+    lddr
+    call drawPlayer
+    ld b, snailAttackFrame
+_:
+    nop
+    djnz -_
+  pop bc
+  djnz _attackAnimation_2
+attackAnimationEnd:
   xor a, a
   ret
 rng:
@@ -785,23 +847,16 @@ drawMultiplier:
 shiftSnails:
 ; shifts the snails up a row.
 ; preserves all
-  breakpoint("shiftSnails")
-  push af
-    push bc
-      push de
-        push hl
-          ld a, (playerPos)
-          call erasePlayer ; erase player
-          ld hl, (lineYStart - 15) * lcdWidth + vRAM
-          ld de, (lineYStart - 16) * lcdWidth + vRAM
-          ld bc, (lineHeight + 15) * lcdWidth
-          ldir
-          ld a, (playerPos)
-          call drawPlayer
-        pop hl
-      pop de
-    pop bc
-  pop af
+  push bc
+    push de
+      push hl
+        ld hl, (lineYStart - 20) * lcdWidth + vRAM ; 20 comes from snail height + snail spacing
+        ld de, (lineYStart - 21) * lcdWidth + vRAM
+        ld bc, (lineHeight + 20) * lcdWidth
+        ldir
+      pop hl
+    pop de
+  pop bc
   ret
 code_end:
 ; code ends here, sprite stuff starts here. All of this was converted with ConvPNG
