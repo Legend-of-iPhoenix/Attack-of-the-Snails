@@ -1,6 +1,5 @@
 .nolist
 #include "ti84pce.inc"
-#include "macros.asm"
 #define dw .dw ; convpng -> compiler compatibility
 #define db .db
 
@@ -350,20 +349,16 @@ movePlayer:
 _getKeyCode:
   push hl
     call _GetCSC
-    breakpoint("getcsc")
     ld hl, evenMoreTimer
     rlc (hl)
   pop hl
   jr nc, _gck_skip
-  breakpoint("dec")
   push af
     dec l
     jr nz, _
     dec h
-    breakpoint("dec2")
     jr z, time_up
 ; shift the snails up a row.
-    breakpoint("shift")
     push hl
       ld hl, (lineYStart - 20) * lcdWidth + vRAM ; 20 comes from snail height + snail spacing
       ld de, (lineYStart - 21) * lcdWidth + vRAM
@@ -639,7 +634,6 @@ _attackAnimation_2:
     ld hl, (lineYStart - 1) * lcdWidth + vRAM ; 30 comes from snail height + snail spacing + the 10 spaces we are shifting them up
     ld de, lineYStart * lcdWidth + vRAM
     ld bc, (snailHeight + snailSpacing + 10) * lcdWidth
-    breakpoint("attk2")
     lddr
     call drawPlayer
     call wait
@@ -647,7 +641,6 @@ _attackAnimation_2:
   djnz _attackAnimation_2
   ld b, (lineDistance * 8 + lineXStart)/2
 _attackAnimation_3:
-  breakpoint("attackAnimation3")
 ; go out to the left
   push bc
     ld b, snailHeight
